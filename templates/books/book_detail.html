@@ -15,9 +15,9 @@
 <div class="white-panel mb-4 fade-up">
     <div class="row g-4">
         <div class="col-md-4">
-            <div style="border-radius:var(--radius);overflow:hidden;position:relative">
+            <div class="book-cover-frame" style="position:relative">
                 {% if book.cover_image %}
-                <img src="{{ book.cover_image }}" alt="{{ book.title }}" class="img-fluid w-100" style="border-radius:var(--radius)">
+                <img src="{{ book.cover_image }}" alt="{{ book.title }}" class="img-fluid w-100 book-cover-image">
                 {% else %}
                 <div class="d-flex align-items-center justify-content-center" style="height:380px;background:linear-gradient(135deg,#DFE6E9,#F0F2F5);border-radius:var(--radius);font-size:5rem">📖</div>
                 {% endif %}
@@ -52,7 +52,9 @@
                 <span class="badge-category"><i class="bi bi-box-seam me-1"></i>Kho: {{ book.stock }}</span>
             </div>
             {% endif %}
-            <p style="color:var(--text-secondary);line-height:1.7">{{ book.description|default:"Chưa có mô tả." }}</p>
+            <div class="divider-line"></div>
+            <h5 class="mb-2">Mô tả</h5>
+            <p class="book-description">{{ book.description|default:"Chưa có mô tả." }}</p>
             <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
                 {% if book.in_stock %}
                 <form action="{% url 'add_to_cart' book.pk %}" method="post" class="d-flex align-items-center gap-2">
@@ -157,8 +159,33 @@
         <span class="icon icon-purple"><i class="bi bi-chat-dots"></i></span>
         Danh gia tu doc gia
     </div>
+    <form method="get" class="review-toolbar">
+        <div class="review-toolbar-group">
+            <label class="small fw-600">Loc theo sao</label>
+            <select name="rating_filter" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="all" {% if rating_filter == "all" %}selected{% endif %}>Tat ca</option>
+                <option value="5" {% if rating_filter == "5" %}selected{% endif %}>5 sao</option>
+                <option value="4" {% if rating_filter == "4" %}selected{% endif %}>4 sao</option>
+                <option value="3" {% if rating_filter == "3" %}selected{% endif %}>3 sao</option>
+                <option value="2" {% if rating_filter == "2" %}selected{% endif %}>2 sao</option>
+                <option value="1" {% if rating_filter == "1" %}selected{% endif %}>1 sao</option>
+            </select>
+        </div>
+        <div class="review-toolbar-group">
+            <label class="small fw-600">Sap xep</label>
+            <select name="rating_sort" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="newest" {% if rating_sort == "newest" %}selected{% endif %}>Moi nhat</option>
+                <option value="oldest" {% if rating_sort == "oldest" %}selected{% endif %}>Cu nhat</option>
+                <option value="highest" {% if rating_sort == "highest" %}selected{% endif %}>Diem cao</option>
+                <option value="lowest" {% if rating_sort == "lowest" %}selected{% endif %}>Diem thap</option>
+            </select>
+        </div>
+        <div class="review-toolbar-meta">
+            Hien thi {{ rating_filtered_total }} / {{ rating_total }} danh gia
+        </div>
+    </form>
     {% for entry in book_ratings %}
-    <div class="d-flex gap-3 p-3 mb-2" style="background:var(--bg-body);border-radius:var(--radius-sm)">
+    <div class="review-card {% if forloop.first %}review-card-highlight{% endif %}">
         <div class="flex-shrink-0">
             <div style="width:42px;height:42px;border-radius:50%;background:var(--gradient-1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.9rem">
                 {{ entry.rating.user.username|first|upper }}

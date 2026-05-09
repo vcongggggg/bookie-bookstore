@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -129,3 +130,12 @@ STATIC_URL = 'static/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 LOGIN_URL = '/login/'
+
+# Ollama (Bookie Chatbot)
+OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen2.5:7b')
+OLLAMA_TIMEOUT = float(os.environ.get('OLLAMA_TIMEOUT', '20'))
+OLLAMA_CONTEXT_TURNS = int(os.environ.get('OLLAMA_CONTEXT_TURNS', '6'))
+OLLAMA_MAX_TOKENS = int(os.environ.get('OLLAMA_MAX_TOKENS', '256'))
+OLLAMA_TEMPERATURE = float(os.environ.get('OLLAMA_TEMPERATURE', '0.2'))
+OLLAMA_NUM_CTX = int(os.environ.get('OLLAMA_NUM_CTX', '2048'))

@@ -2,16 +2,14 @@
 {% block title %}Trang chủ - Smart Bookstore{% endblock %}
 {% block content %}
 <!-- Hero Section -->
-<section class="hero-section mb-5 fade-up" style="background: var(--gradient-hero); border-radius: var(--radius-lg); padding: 3.5rem 2.5rem; color: #fff; position: relative; overflow: hidden;">
-    <div class="hero-glow" style="position:absolute;top:-50%;right:-20%;width:400px;height:400px;background:rgba(162,155,254,.25);border-radius:50%;filter:blur(80px)"></div>
-    <div class="hero-glow" style="position:absolute;bottom:-40%;left:-10%;width:300px;height:300px;background:rgba(253,121,168,.15);border-radius:50%;filter:blur(60px)"></div>
-    <div class="row align-items-center position-relative">
+<section class="hero-section editorial-hero mb-5 fade-up" style="border-radius: var(--radius-lg); padding: 3.5rem 2.5rem; color: #fff;">
+    <div class="row align-items-center position-relative" style="z-index:1">
         <div class="col-lg-7">
-            <h1 class="fw-800 mb-3" style="font-size:2.5rem;line-height:1.2">
-                Khám phá thế giới<br>qua từng <span style="background:var(--gradient-2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">trang sách</span>
+            <h1 class="fw-800 mb-3" style="font-size:2.75rem;line-height:1.15">
+                Thế giới tri thức<br>được kể qua từng <span style="background:var(--gradient-2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">trang sách</span>
             </h1>
-            <p class="mb-4" style="font-size:1.1rem;opacity:.85;max-width:500px">
-                Hệ thống gợi ý AI thông minh giúp bạn tìm đúng cuốn sách phù hợp. Hơn <strong>{{ total_books }}</strong> cuốn sách từ <strong>{{ total_categories }}</strong> thể loại.
+            <p class="mb-4" style="font-size:1.05rem;opacity:.9;max-width:520px">
+                Không gian đọc tinh tuyển với <strong>{{ total_books }}</strong> cuốn sách từ <strong>{{ total_categories }}</strong> thể loại. AI gợi ý giúp bạn tìm đúng cuốn sách hợp gu.
             </p>
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{% url 'book_list' %}" class="btn btn-light fw-bold px-4 py-2" style="border-radius:50px;color:var(--primary)">
@@ -21,9 +19,6 @@
                     <i class="bi bi-tag me-1"></i> Duyệt thể loại
                 </a>
             </div>
-        </div>
-        <div class="col-lg-5 d-none d-lg-flex justify-content-center">
-            <div style="font-size:8rem;opacity:.6">📚</div>
         </div>
     </div>
 </section>
@@ -202,24 +197,27 @@
 </div>
 <div class="slider-wrapper mb-5">
     <div class="scroll-container" id="aiSlider">
-        {% for book in recommended_books %}
+        {% for rec in recommended_books %}
         <div class="card card-book h-100" style="border:2px solid rgba(108,92,231,.15)">
             <div class="img-wrapper">
-                <a href="{% url 'book_detail' book.pk %}">
-                    {% if book.cover_image %}
-                    <img src="{{ book.cover_image }}" class="card-img-top" alt="{{ book.title }}">
+                <a href="{% url 'book_detail' rec.book.pk %}">
+                    {% if rec.book.cover_image %}
+                    <img src="{{ rec.book.cover_image }}" class="card-img-top" alt="{{ rec.book.title }}">
                     {% else %}
                     <div class="card-img-top d-flex align-items-center justify-content-center" style="font-size:3rem;color:var(--text-muted)">📖</div>
                     {% endif %}
                 </a>
             </div>
             <div class="card-body">
-                <h5 class="card-title text-truncate"><a href="{% url 'book_detail' book.pk %}">{{ book.title }}</a></h5>
-                <p class="author mb-1 text-truncate">{{ book.author }}</p>
+                <h5 class="card-title text-truncate"><a href="{% url 'book_detail' rec.book.pk %}">{{ rec.book.title }}</a></h5>
+                <p class="author mb-1 text-truncate">{{ rec.book.author }}</p>
                 <div class="d-flex align-items-center justify-content-between">
-                    <span class="price">{{ book.price|floatformat:0 }}₫</span>
-                    <button class="btn-icon btn-icon-cart ajax-add-cart" data-book-id="{{ book.pk }}"><i class="bi bi-bag-plus"></i></button>
+                    <span class="price">{{ rec.book.price|floatformat:0 }}₫</span>
+                    <button class="btn-icon btn-icon-cart ajax-add-cart" data-book-id="{{ rec.book.pk }}"><i class="bi bi-bag-plus"></i></button>
                 </div>
+                {% if rec.reason %}
+                <div class="mt-2" style="font-size:.75rem;color:var(--text-muted)">{{ rec.reason }}</div>
+                {% endif %}
             </div>
         </div>
         {% endfor %}

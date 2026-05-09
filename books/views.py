@@ -4,14 +4,16 @@ import math
 import re
 from collections import Counter, defaultdict
 from datetime import timedelta
+from typing import Any, Iterable
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, F, Q, Sum
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -20,6 +22,7 @@ from django.views.decorators.http import require_POST
 from .chatbot import BookieChatbot
 from .forms import CheckoutForm, ProfileEditForm, RatingForm, RegisterForm
 from .models import Book, Category, Coupon, Order, OrderItem, Rating, Wishlist
+from .ollama_client import OllamaClient, OllamaConfig
 
 User = get_user_model()
 
@@ -332,7 +335,27 @@ def book_detail(request, pk: int):
         .order_by("title")[:6]
     )
     avg_rating = book.ratings.aggregate(avg=Avg("score"), cnt=Count("id"))
-    book_ratings = book.ratings.select_related("user").order_by("-created_at")[:10]
+    rating_sort = request.GET.get("rating_sort", "newest")
+    rating_filter = request.GET.get("rating_filter", "all")
+
+    book_ratings_qs = book.ratings.select_related("user")
+    if rating_filter.isdigit():
+        score_value = int(rating_filter)
+        if 1 <= score_value <= 5:
+            book_ratings_qs = book_ratings_qs.filter(score=score_value)
+
+    if rating_sort == "oldest":
+        book_ratings_qs = book_ratings_qs.order_by("created_at")
+    elif rating_sort == "highest":
+        book_ratings_qs = book_ratings_qs.order_by("-score", "-created_at")
+    elif rating_sort == "lowest":
+        book_ratings_qs = book_ratings_qs.order_by("score", "-created_at")
+    else:
+        book_ratings_qs = book_ratings_qs.order_by("-created_at")
+
+    book_ratings = list(book_ratings_qs[:10])
+    rating_total = book.ratings.count()
+    rating_filtered_total = book_ratings_qs.count()
 
     # AI: Sentiment analysis
     sentiment_summary = _get_book_sentiment_summary(book)
@@ -360,6 +383,10 @@ def book_detail(request, pk: int):
         "same_author_books": same_author_books,
         "avg_rating": avg_rating,
         "book_ratings": rated_with_sentiment,
+        "rating_sort": rating_sort,
+        "rating_filter": rating_filter,
+        "rating_total": rating_total,
+        "rating_filtered_total": rating_filtered_total,
         "sentiment_summary": sentiment_summary,
         "user_rating": user_rating,
         "rating_form": rating_form,
@@ -903,27 +930,28 @@ def _get_explainable_recommendations(user, limit=8):
 
     # 3. "Users with similar taste also bought"
     if bought_ids:
-        similar_users = (
+        similar_users = list(
             OrderItem.objects.filter(book_id__in=bought_ids)
             .exclude(order__user=user)
             .values_list("order__user", flat=True)
             .distinct()[:30]
         )
-        collaborative = (
-            Book.objects.filter(order_items__order__user__in=similar_users)
-            .exclude(pk__in=exclude_ids)
-            .annotate(buy_count=Count("order_items"))
-            .order_by("-buy_count")
-            .distinct()[:3]
-        )
-        for b in collaborative:
-            recommendations.append({
-                "book": b,
-                "reason": "Nguoi dung co so thich tuong tu da mua",
-                "reason_type": "collaborative",
-                "reason_icon": "bi-people",
-            })
-            exclude_ids.add(b.pk)
+        if similar_users:
+            collaborative = (
+                Book.objects.filter(order_items__order__user__in=similar_users)
+                .exclude(pk__in=exclude_ids)
+                .annotate(buy_count=Count("order_items"))
+                .order_by("-buy_count")
+                .distinct()[:3]
+            )
+            for b in collaborative:
+                recommendations.append({
+                    "book": b,
+                    "reason": "Nguoi dung co so thich tuong tu da mua",
+                    "reason_type": "collaborative",
+                    "reason_icon": "bi-people",
+                })
+                exclude_ids.add(b.pk)
 
     # 4. "Trending in your favorite categories"
     if liked_categories:
@@ -1200,8 +1228,84 @@ def reading_dna(request):
     }
     return render(request, "books/reading_dna.html", context)
 
+
+def _get_chat_history(request) -> list[dict[str, str]]:
+    history = request.session.get("chat_history")
+    if not isinstance(history, list):
+        return []
+    sanitized = [
+        {"role": item.get("role", ""), "content": item.get("content", "")}
+        for item in history
+        if isinstance(item, dict)
+    ]
+    return sanitized
+
+
+def _append_chat_history(
+    request,
+    history: list[dict[str, str]],
+    role: str,
+    content: str,
+    max_turns: int,
+) -> list[dict[str, str]]:
+    updated = history + [{"role": role, "content": content}]
+    limit = max_turns * 2
+    if len(updated) > limit:
+        updated = updated[-limit:]
+    request.session["chat_history"] = updated
+    request.session.modified = True
+    return updated
+
+
+def _get_last_books(request) -> list[dict[str, Any]]:
+    last_books = request.session.get("chat_last_books")
+    if not isinstance(last_books, list):
+        return []
+    sanitized = [
+        {"id": item.get("id"), "title": item.get("title", "")}
+        for item in last_books
+        if isinstance(item, dict)
+    ]
+    return sanitized
+
+
+def _set_last_books(request, books: list[dict[str, Any]]) -> None:
+    trimmed = [
+        {"id": book.get("id"), "title": book.get("title", "")}
+        for book in books
+        if isinstance(book, dict)
+    ][:6]
+    request.session["chat_last_books"] = trimmed
+    request.session.modified = True
+
+
+def _build_chatbot(request) -> BookieChatbot:
+    config = OllamaConfig(
+        base_url=settings.OLLAMA_BASE_URL,
+        model=settings.OLLAMA_MODEL,
+        timeout=settings.OLLAMA_TIMEOUT,
+        max_tokens=settings.OLLAMA_MAX_TOKENS,
+        temperature=settings.OLLAMA_TEMPERATURE,
+        num_ctx=settings.OLLAMA_NUM_CTX,
+    )
+    client = OllamaClient(config)
+    return BookieChatbot(
+        user=request.user,
+        client=client,
+        max_turns=settings.OLLAMA_CONTEXT_TURNS,
+    )
+
+
+def _stream_chat_payload(payload: dict[str, Any], chunk_size: int = 24) -> Iterable[bytes]:
+    yield json.dumps({"type": "start"}, ensure_ascii=False).encode("utf-8") + b"\n"
+    text = str(payload.get("text", ""))
+    for i in range(0, len(text), chunk_size):
+        chunk = text[i : i + chunk_size]
+        yield json.dumps({"type": "delta", "content": chunk}, ensure_ascii=False).encode("utf-8") + b"\n"
+    yield json.dumps({"type": "final", "payload": payload}, ensure_ascii=False).encode("utf-8") + b"\n"
+
 @csrf_exempt
-def api_chatbot(request):
+def api_chatbot(request) -> JsonResponse:
     """API for Bookie Chatbot."""
     if request.method != "POST":
         return JsonResponse({"error": "Only POST allowed"}, status=405)
@@ -1213,9 +1317,66 @@ def api_chatbot(request):
         if not user_message:
             return JsonResponse({"error": "No message provided"}, status=400)
             
-        bot = BookieChatbot(user=request.user)
-        response = bot.get_response(user_message)
+        history = _get_chat_history(request)
+        last_books = _get_last_books(request)
+        bot = _build_chatbot(request)
+        response = bot.get_response(user_message, history, last_books)
+        updated = _append_chat_history(
+            request,
+            history,
+            "user",
+            user_message,
+            settings.OLLAMA_CONTEXT_TURNS,
+        )
+        _append_chat_history(
+            request,
+            updated,
+            "assistant",
+            response.get("text", ""),
+            settings.OLLAMA_CONTEXT_TURNS,
+        )
+        if response.get("type") == "books":
+            _set_last_books(request, response.get("books", []))
         
         return JsonResponse(response)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@csrf_exempt
+def api_chatbot_stream(request) -> HttpResponse:
+    """Streaming API for Bookie Chatbot (NDJSON)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST allowed"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        user_message = data.get("message", "").strip()
+        if not user_message:
+            return JsonResponse({"error": "No message provided"}, status=400)
+
+        history = _get_chat_history(request)
+        last_books = _get_last_books(request)
+        bot = _build_chatbot(request)
+        response = bot.get_response(user_message, history, last_books)
+        updated = _append_chat_history(
+            request,
+            history,
+            "user",
+            user_message,
+            settings.OLLAMA_CONTEXT_TURNS,
+        )
+        _append_chat_history(
+            request,
+            updated,
+            "assistant",
+            response.get("text", ""),
+            settings.OLLAMA_CONTEXT_TURNS,
+        )
+        if response.get("type") == "books":
+            _set_last_books(request, response.get("books", []))
+
+        stream = _stream_chat_payload(response)
+        return StreamingHttpResponse(stream, content_type="application/x-ndjson")
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)

@@ -36,4 +36,5 @@ urlpatterns = [
     path("api/v1/books/<int:pk>/", views.api_book_detail, name="api_book_detail"),
     path("api/v1/stats/", views.api_stats, name="api_stats"),
     path("api/v1/chatbot/", views.api_chatbot, name="api_chatbot"),
+    path("api/v1/chatbot/stream/", views.api_chatbot_stream, name="api_chatbot_stream"),
 ]
