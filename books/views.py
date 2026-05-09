@@ -549,6 +549,7 @@ def checkout(request):
                 note=form.cleaned_data.get("note", ""),
                 coupon=applied_coupon,
                 discount_amount=discount_amount,
+                payment_method=form.cleaned_data["payment_method"],
             )
             for row in items:
                 OrderItem.objects.create(
@@ -567,6 +568,10 @@ def checkout(request):
                 applied_coupon.save(update_fields=["used_count"])
 
             _set_cart(request, {})
+            
+            if order.payment_method != "cod":
+                return redirect("payment_gateway", pk=order.pk)
+
             messages.success(request, f"Đặt hàng thành công! Mã đơn: #{order.pk}")
             return redirect("order_detail", pk=order.pk)
     else:
@@ -610,6 +615,28 @@ def api_apply_coupon(request):
         })
     except Coupon.DoesNotExist:
         return JsonResponse({"status": "error", "message": "Mã giảm giá không tồn tại."})
+
+
+@login_required
+def payment_gateway(request, pk: int):
+    """View to display mock payment gateway (QR, timer, etc)."""
+    order = get_object_or_404(Order, pk=pk, user=request.user)
+    if order.status != "pending":
+        return redirect("order_detail", pk=order.pk)
+    
+    return render(request, "books/payment.html", {"order": order})
+
+
+@login_required
+def payment_confirm(request, pk: int):
+    """View to handle payment confirmation (mock callback)."""
+    order = get_object_or_404(Order, pk=pk, user=request.user)
+    if order.status == "pending":
+        order.status = "confirmed"
+        order.save(update_fields=["status"])
+        messages.success(request, f"Thanh toán thành công cho đơn hàng #{order.pk}!")
+    
+    return redirect("order_detail", pk=order.pk)
 
 
 @login_required

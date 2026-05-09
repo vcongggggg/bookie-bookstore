@@ -91,6 +91,7 @@ class Order(models.Model):
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    payment_method = models.CharField(max_length=20, default="cod", choices=[("cod", "COD"), ("vnpay", "VNPay"), ("momo", "Momo")])
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     note = models.TextField(blank=True, help_text="Ghi chú đơn hàng")

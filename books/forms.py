@@ -60,3 +60,14 @@ class CheckoutForm(forms.Form):
         label="Mã giảm giá",
         required=False,
     )
+    PAYMENT_CHOICES = [
+        ("cod", "Thanh toán khi nhận hàng (COD)"),
+        ("vnpay", "Ví điện tử VNPay"),
+        ("momo", "Ví điện tử Momo"),
+    ]
+    payment_method = forms.ChoiceField(
+        choices=PAYMENT_CHOICES,
+        widget=forms.RadioSelect(attrs={"class": "form-check-input"}),
+        label="Phương thức thanh toán",
+        initial="cod"
+    )

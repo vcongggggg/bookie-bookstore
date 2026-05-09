@@ -9,6 +9,29 @@
         <form method="post" id="checkout-form">
             {% csrf_token %}
             <div class="white-panel mb-3 fade-up">
+                <h5 class="fw-bold mb-3"><i class="bi bi-wallet2 me-2" style="color:var(--primary)"></i>Phương thức thanh toán</h5>
+                <div class="payment-methods">
+                    {% for value, text in form.payment_method.field.choices %}
+                    <div class="form-check payment-method-item p-3 mb-2 border rounded-3 transition-base" style="cursor:pointer" onclick="document.getElementById('pay_{{ value }}').click()">
+                        <input class="form-check-input ms-0 me-2" type="radio" name="payment_method" id="pay_{{ value }}" value="{{ value }}" {% if form.payment_method.value == value or forloop.first %}checked{% endif %}>
+                        <label class="form-check-label d-flex align-items-center gap-2" for="pay_{{ value }}" style="cursor:pointer">
+                            {% if value == 'vnpay' %}
+                            <img src="https://cdn.haitrieu.com/wp-content/uploads/2022/10/Logo-VNPAY-QR-1.png" height="20" alt="VNPay" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block'">
+                            <span class="badge bg-primary" style="display:none">VNPay</span>
+                            {% elif value == 'momo' %}
+                            <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" height="20" alt="Momo" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block'">
+                            <span class="badge" style="display:none; background:#a50064">MoMo</span>
+                            {% else %}
+                            <i class="bi bi-cash-stack text-success"></i>
+                            {% endif %}
+                            <span class="fw-600">{{ text }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="white-panel mb-3 fade-up">
                 <h5 class="fw-bold mb-3"><i class="bi bi-geo-alt me-2" style="color:var(--accent)"></i>Thông tin giao hàng</h5>
                 <div class="mb-3">
                     <label class="form-label fw-600">{{ form.shipping_address.label }}</label>
@@ -128,4 +151,12 @@
         });
     });
 </script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .payment-method-item { transition: all 0.2s ease; border-color: var(--border) !important; }
+    .payment-method-item:hover { background: rgba(108,92,231, 0.05); border-color: var(--primary) !important; }
+    .payment-method-item:has(input:checked) { background: rgba(108,92,231, 0.1) !important; border-color: var(--primary) !important; }
+</style>
 {% endblock %}
