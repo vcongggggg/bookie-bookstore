@@ -622,14 +622,60 @@ def api_apply_coupon(request):
         return JsonResponse({"status": "error", "message": "Mã giảm giá không tồn tại."})
 
 
+from django.urls import reverse
+from .vnpay import VNPay
+
 @login_required
 def payment_gateway(request, pk: int):
-    """View to display mock payment gateway (QR, timer, etc)."""
+    """View to handle payment gateway redirect (VNPay or mock)."""
     order = get_object_or_404(Order, pk=pk, user=request.user)
     if order.status != "pending":
         return redirect("order_detail", pk=order.pk)
     
+    if order.payment_method == "vnpay":
+        vnp = VNPay(
+            tmn_code=os.getenv('VNP_TMN_CODE'),
+            hash_key=os.getenv('VNP_HASH_KEY'),
+            return_url=request.build_absolute_uri(reverse('vnpay_return')),
+            api_url=os.getenv('VNP_URL')
+        )
+        # Tính tổng tiền (sau chiết khấu)
+        total = order.total
+        payment_url = vnp.get_payment_url(
+            order_id=order.pk,
+            amount=total,
+            order_desc=f"Thanh toan don hang #{order.pk} tai Smart Bookstore",
+            ipaddr=request.META.get('REMOTE_ADDR')
+        )
+        return redirect(payment_url)
+    
     return render(request, "books/payment.html", {"order": order})
+
+def vnpay_return(request):
+    """Callback view for VNPay payment result."""
+    vnp = VNPay(
+        tmn_code=os.getenv('VNP_TMN_CODE'),
+        hash_key=os.getenv('VNP_HASH_KEY'),
+        return_url='', # Không cần cho bước validate
+        api_url=''
+    )
+    
+    if vnp.validate_response(request.GET):
+        order_id = request.GET.get('vnp_TxnRef')
+        response_code = request.GET.get('vnp_ResponseCode')
+        order = get_object_or_404(Order, pk=order_id)
+        
+        if response_code == "00":
+            order.status = "confirmed"
+            order.save(update_fields=["status"])
+            messages.success(request, f"Thanh toán VNPay thành công cho đơn hàng #{order.pk}!")
+        else:
+            messages.error(request, f"Thanh toán VNPay thất bại. Mã lỗi: {response_code}")
+            
+        return redirect("order_detail", pk=order.pk)
+    
+    messages.error(request, "Dữ liệu thanh toán không hợp lệ (Checksum failed).")
+    return redirect("order_list")
 
 
 @login_required
@@ -869,7 +915,7 @@ def _get_book_sentiment_summary(book):
 
 
 def _get_user_reading_dna(user):
-    """Analyze user's reading preferences and build a 'Reading DNA' profile."""
+    """Analyze user's reading preferences and build an advanced 'Reading DNA' profile with chart data."""
     orders = OrderItem.objects.filter(order__user=user).select_related("book__category")
     ratings = Rating.objects.filter(user=user).select_related("book__category")
 
@@ -878,25 +924,44 @@ def _get_user_reading_dna(user):
 
     dna = {}
 
-    # Category preferences
+    # 1. Category preferences (For Radar Chart)
     cat_counter = Counter()
     for item in orders:
         if item.book.category:
             cat_counter[item.book.category.name] += item.quantity
     for r in ratings:
         if r.book.category and r.score >= 4:
-            cat_counter[r.book.category.name] += r.score - 2  # weight by score
+            cat_counter[r.book.category.name] += r.score - 2
+            
+    dna["chart_categories"] = {
+        "labels": [name for name, _ in cat_counter.most_common(5)],
+        "values": [count for _, count in cat_counter.most_common(5)]
+    }
+    
+    total_cat = sum(cat_counter.values())
+    dna["categories"] = [
+        {"name": name, "count": count, "pct": round(count / total_cat * 100) if total_cat else 0}
+        for name, count in cat_counter.most_common(6)
+    ]
 
-    if cat_counter:
-        total_cat = sum(cat_counter.values())
-        dna["categories"] = [
-            {"name": name, "count": count, "pct": round(count / total_cat * 100)}
-            for name, count in cat_counter.most_common(6)
-        ]
-    else:
-        dna["categories"] = []
+    # 2. Monthly Trend (For Line Chart)
+    # Get last 6 months of purchases
+    six_months_ago = timezone.now() - timedelta(days=180)
+    monthly_data = (
+        OrderItem.objects.filter(order__user=user, order__created_at__gte=six_months_ago)
+        .annotate(month=F("order__created_at__month"))
+        .values("month")
+        .annotate(total=Sum("quantity"))
+        .order_by("month")
+    )
+    
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    dna["chart_trend"] = {
+        "labels": [month_names[d["month"]-1] for d in monthly_data],
+        "values": [d["total"] for d in monthly_data]
+    }
 
-    # Favorite authors
+    # 3. Favorite authors
     author_counter = Counter()
     for item in orders:
         author_counter[item.book.author] += item.quantity
@@ -908,46 +973,32 @@ def _get_user_reading_dna(user):
         for name, count in author_counter.most_common(5)
     ]
 
-    # Price range preference
+    # 4. Stats & Price range
     prices = [float(item.book.price) for item in orders]
-    if prices:
-        dna["price_range"] = {
-            "min": min(prices),
-            "max": max(prices),
-            "avg": round(sum(prices) / len(prices)),
-        }
-    else:
-        dna["price_range"] = None
-
-    # Average rating given
-    avg_score = ratings.aggregate(avg=Avg("score"))["avg"]
-    dna["avg_rating_given"] = round(avg_score, 1) if avg_score else None
-
-    # Total books, total spent
+    dna["price_range"] = {
+        "min": min(prices) if prices else 0,
+        "max": max(prices) if prices else 0,
+        "avg": round(sum(prices) / len(prices)) if prices else 0,
+    }
     dna["total_books_bought"] = sum(item.quantity for item in orders)
     dna["total_spent"] = sum(float(item.price) * item.quantity for item in orders)
     dna["total_ratings"] = ratings.count()
 
-    # Reading mood (based on category distribution)
-    if dna["categories"]:
-        top_cat = dna["categories"][0]["name"].lower()
-        mood_map = {
-            "fiction": "Dreamer",
-            "mystery": "Detective",
-            "romance": "Romantic",
-            "science": "Explorer",
-            "programming": "Builder",
-            "history": "Historian",
-            "fantasy": "Adventurer",
-            "thriller": "Thrill-Seeker",
-        }
-        dna["reading_mood"] = "Bookworm"
-        for key, mood in mood_map.items():
-            if key in top_cat:
-                dna["reading_mood"] = mood
-                break
-    else:
-        dna["reading_mood"] = "Newcomer"
+    # 5. Reading Mood & AI Persona
+    top_cat = dna["categories"][0]["name"].lower() if dna["categories"] else ""
+    mood_map = {
+        "fiction": "Dreamer", "mystery": "Detective", "romance": "Romantic",
+        "science": "Explorer", "programming": "Builder", "history": "Historian",
+        "fantasy": "Adventurer", "thriller": "Thrill-Seeker",
+    }
+    dna["reading_mood"] = "Bookworm"
+    for key, mood in mood_map.items():
+        if key in top_cat:
+            dna["reading_mood"] = mood
+            break
+            
+    # AI generated persona summary (Simplified for speed)
+    dna["ai_insight"] = f"Bạn là một {dna['reading_mood']} chính hiệu với niềm đam mê lớn dành cho {top_cat.upper()}. Phong cách đọc của bạn cho thấy sự tò mò vô tận!"
 
     dna["milestones"] = _get_user_milestones(user, dna)
     return dna
@@ -1423,13 +1474,21 @@ def _build_chatbot(request) -> BookieChatbot:
     )
 
 
-def _stream_chat_payload(payload: dict[str, Any], chunk_size: int = 24) -> Iterable[bytes]:
+def _stream_chat_payload(payload_or_generator, is_real_stream=False, chunk_size: int = 24) -> Iterable[bytes]:
     yield json.dumps({"type": "start"}, ensure_ascii=False).encode("utf-8") + b"\n"
-    text = str(payload.get("text", ""))
-    for i in range(0, len(text), chunk_size):
-        chunk = text[i : i + chunk_size]
-        yield json.dumps({"type": "delta", "content": chunk}, ensure_ascii=False).encode("utf-8") + b"\n"
-    yield json.dumps({"type": "final", "payload": payload}, ensure_ascii=False).encode("utf-8") + b"\n"
+    if is_real_stream:
+        full_text = ""
+        for chunk in payload_or_generator:
+            full_text += chunk
+            yield json.dumps({"type": "delta", "content": chunk}, ensure_ascii=False).encode("utf-8") + b"\n"
+        yield json.dumps({"type": "final", "payload": {"text": full_text, "type": "text"}}, ensure_ascii=False).encode("utf-8") + b"\n"
+    else:
+        payload = payload_or_generator
+        text = str(payload.get("text", ""))
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i : i + chunk_size]
+            yield json.dumps({"type": "delta", "content": chunk}, ensure_ascii=False).encode("utf-8") + b"\n"
+        yield json.dumps({"type": "final", "payload": payload}, ensure_ascii=False).encode("utf-8") + b"\n"
 
 @csrf_exempt
 def api_chatbot(request) -> JsonResponse:
@@ -1471,6 +1530,74 @@ def api_chatbot(request) -> JsonResponse:
 
 
 @csrf_exempt
+def api_chatbot(request) -> JsonResponse:
+    """API for Bookie Chatbot (Synchronous fallback)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST allowed"}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        user_message = data.get("message", "").strip()
+        if not user_message:
+            return JsonResponse({"error": "No message provided"}, status=400)
+            
+        history = _get_chat_history(request)
+        bot = _build_chatbot(request)
+        
+        # 1. Xử lý phản hồi
+        response = bot.get_response(user_message, history, None)
+        
+        # 2. Cập nhật lịch sử (User)
+        updated = _append_chat_history(
+            request,
+            history,
+            "user",
+            user_message,
+            settings.OLLAMA_CONTEXT_TURNS,
+        )
+        # 3. Cập nhật lịch sử (Assistant)
+        _append_chat_history(
+            request,
+            updated,
+            "assistant",
+            response.get("text", ""),
+            settings.OLLAMA_CONTEXT_TURNS,
+        )
+        if response.get("type") == "books":
+            _set_last_books(request, response.get("books", []))
+            
+        return JsonResponse(response)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+def _stream_chat_payload(request, stream_gen, user_message, found_books) -> Iterable[bytes]:
+    """Generator that yields NDJSON chunks and updates session history at the end."""
+    yield json.dumps({"type": "start"}, ensure_ascii=False).encode("utf-8") + b"\n"
+    
+    full_text = ""
+    for chunk in stream_gen:
+        full_text += chunk
+        yield json.dumps({"type": "delta", "content": chunk}, ensure_ascii=False).encode("utf-8") + b"\n"
+    
+    payload = {"text": full_text, "type": "text"}
+    if found_books:
+        payload["type"] = "books"
+        payload["books"] = found_books
+
+    yield json.dumps({"type": "final", "payload": payload}, ensure_ascii=False).encode("utf-8") + b"\n"
+
+    try:
+        history = _get_chat_history(request)
+        _append_chat_history(request, history, "assistant", full_text, settings.OLLAMA_CONTEXT_TURNS)
+        if found_books:
+            _set_last_books(request, found_books)
+        request.session.save()
+    except Exception:
+        pass
+
+
+@csrf_exempt
 def api_chatbot_stream(request) -> HttpResponse:
     """Streaming API for Bookie Chatbot (NDJSON)."""
     if request.method != "POST":
@@ -1483,27 +1610,26 @@ def api_chatbot_stream(request) -> HttpResponse:
             return JsonResponse({"error": "No message provided"}, status=400)
 
         history = _get_chat_history(request)
-        last_books = _get_last_books(request)
         bot = _build_chatbot(request)
-        response = bot.get_response(user_message, history, last_books)
-        updated = _append_chat_history(
-            request,
-            history,
-            "user",
-            user_message,
-            settings.OLLAMA_CONTEXT_TURNS,
-        )
-        _append_chat_history(
-            request,
-            updated,
-            "assistant",
-            response.get("text", ""),
-            settings.OLLAMA_CONTEXT_TURNS,
-        )
-        if response.get("type") == "books":
-            _set_last_books(request, response.get("books", []))
+        
+        # 1. Lưu user message ngay
+        history = _append_chat_history(request, history, "user", user_message, settings.OLLAMA_CONTEXT_TURNS)
+        request.session.save()
 
-        stream = _stream_chat_payload(response)
-        return StreamingHttpResponse(stream, content_type="application/x-ndjson")
+        # 2. Lấy context sách
+        found_books = bot.prepare_stream_context(user_message)
+        
+        # 3. Build prompt (Dùng hàm mới!)
+        prompt = bot.build_prompt(user_message, history, found_books)
+        
+        # 4. Stream
+        stream_gen = bot._client.stream_generate(prompt)
+        
+        return StreamingHttpResponse(
+            _stream_chat_payload(request, stream_gen, user_message, found_books), 
+            content_type="application/x-ndjson"
+        )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=400)

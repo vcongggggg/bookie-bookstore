@@ -34,37 +34,79 @@ class BookieChatbot:
         history: Sequence[ChatMessage],
         last_books: Sequence[dict[str, Any]] | None,
     ) -> dict[str, Any]:
-        prompt = self._build_prompt(text, history, last_books or [])
+        # BƯỚC 1: Tìm kiếm sách thực tế trong database trước
+        search_query = _normalize_query(text)
+        found_books = []
+        if search_query and len(search_query) > 2:
+            books_qs = Book.objects.filter(
+                Q(title__icontains=search_query) | 
+                Q(category__name__icontains=search_query) |
+                Q(description__icontains=search_query)
+            )[:3]
+            if books_qs.exists():
+                found_books = [
+                    {
+                        "id": b.pk,
+                        "title": b.title,
+                        "price": f"{b.price:,.0f}₫",
+                        "url": f"/books/{b.pk}/",
+                        "image": b.cover_image if b.cover_image else None,
+                    }
+                    for b in books_qs
+                ]
+
+        # BƯỚC 2: Xây dựng Prompt
+        prompt = self.build_prompt(text, history, found_books)
+        
         try:
+            # Tăng timeout cho Ollama vì model 7B có thể phản hồi chậm
             raw = self._client.generate(prompt)
-        except OllamaError:
+        except Exception as e:
+            # Nếu AI lỗi hoặc quá chậm, vẫn trả về sách tìm được nếu có
+            if found_books:
+                return {
+                    "text": f"Bookie tìm thấy một số sách phù hợp với yêu cầu của bạn đây:",
+                    "type": "books",
+                    "books": found_books,
+                }
             return self._fallback_response()
 
-        parsed = _parse_model_output(raw)
-        if not parsed:
-            parsed = self._repair_json(raw)
-            if not parsed:
-                return self._fallback_response()
+        # BƯỚC 3: Làm sạch và trả lời
+        clean_text = raw
+        parsed = None
+        match = re.search(r"\{[\s\S]*?\}", raw, re.DOTALL)
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+                clean_text = raw[:match.start()].strip()
+            except:
+                pass
 
-        if "action" in parsed:
+        if found_books:
+            return {
+                "text": clean_text or f"Dưới đây là một số sách về chủ đề bạn quan tâm:",
+                "type": "books",
+                "books": found_books,
+            }
+
+        if parsed and "action" in parsed:
             action_response = self._handle_action(parsed)
             if action_response:
+                action_response["text"] = clean_text or action_response.get("text", "")
                 return action_response
-            return self._fallback_response()
 
-        normalized = _normalize_response(parsed)
-        if not normalized:
-            return self._fallback_response()
-        return normalized
+        return {"text": clean_text or raw.strip(), "type": "text"}
 
-    def _build_prompt(
+    def build_prompt(
         self,
         text: str,
         history: Sequence[ChatMessage],
-        last_books: Sequence[dict[str, Any]],
+        found_books: list[dict[str, Any]] | None = None,
     ) -> str:
-        user_name = self.user.username if self.user and self.user.is_authenticated else ""
-        user_state = "đăng nhập" if user_name else "khách"
+        """Unified prompt builder for both sync and stream modes."""
+        user_name = self.user.username if self.user and self.user.is_authenticated else "Khách"
+        
+        # Lấy tối đa n lượt hội thoại gần nhất để tránh tràn context
         clipped_history = list(history)[-self._max_turns * 2 :]
         history_lines = []
         for item in clipped_history:
@@ -74,42 +116,51 @@ class BookieChatbot:
                 history_lines.append(f"{role}: {content}")
         history_block = "\n".join(history_lines)
 
-        system_prompt = (
-            "Bạn là Bookie, trợ lý ảo của Smart Bookstore. "
-            "Trả lời bằng tiếng Việt, thân thiện, ngắn gọn. "
-            "Chỉ được xuất JSON hợp lệ, không thêm bất kỳ text nào khác. "
-            "Không dùng ngôn ngữ khác ngoài tiếng Việt. "
-            "Nếu câu hỏi ngoài phạm vi bookstore, hãy trả lời bình thường (type=text). "
-            "Nếu cần danh sách sách, sử dụng action thay vì tự ý tưởng tượng.\n"
-            "Schema hợp lệ:\n"
-            "1) {\"text\": \"...\", \"type\": \"text\", \"quick_replies\": [\"...\"]}\n"
-            "2) {\"action\": \"search_books\", \"query\": \"...\", \"limit\": 3}\n"
-            "3) {\"action\": \"order_status\"}\n"
-            "4) {\"action\": \"reading_dna\"}\n"
-            "5) {\"action\": \"popular_books\", \"limit\": 3}\n"
-            "6) {\"action\": \"book_details\", \"ids\": [1, 2]}\n"
-            f"Trạng thái người dùng: {user_state}."
+        system_rules = [
+            "Bạn là Bookie, trợ lý ảo CHỈ ĐƯỢC PHÉP tư vấn sách dựa trên dữ liệu thực tế của nhà sách.",
+            "QUY TẮC CỰC KỲ NGHIÊM NGẶT:",
+            "1. KHÔNG ĐƯỢC TỰ BỊA TÊN SÁCH. Nếu không có sách trong dữ liệu, hãy nói: 'Tiếc quá, hiện tại Bookie chưa có sách đúng chủ đề này. Bạn thử tìm chủ đề khác nhé!'",
+            "2. CHỈ TRẢ LỜI những gì liên quan đến sách và hỗ trợ khách hàng. Không tán gẫu ngoài lề.",
+            "3. Nếu có sách được cung cấp bên dưới, hãy liệt kê chúng một cách chuyên nghiệp.",
+        ]
+
+        if found_books:
+            titles = ", ".join([f"'{b['title']}'" for b in found_books])
+            system_rules.append(f"DỮ LIỆU SÁCH CÓ THẬT: {titles}. Hãy giới thiệu chính xác các cuốn này.")
+        else:
+            system_rules.append("DỮ LIỆU SÁCH CÓ THẬT: TRỐNG. (Cảnh báo: Không có sách phù hợp, hãy thông báo cho khách).")
+
+        system_prompt = "\n".join(system_rules)
+
+        prompt = (
+            f"System: {system_prompt}\n\n"
+            f"History:\n{history_block}\n\n"
+            f"User: {text}\n\n"
+            f"Assistant:"
         )
+        return prompt
 
-        if user_name:
-            system_prompt += f" Tên người dùng: {user_name}."
-
-        prompt_parts = [system_prompt]
-        if last_books:
-            book_lines = [
-                f"- {book.get('id')}: {book.get('title', '')}"
-                for book in last_books
-                if book.get("id")
+    def prepare_stream_context(self, text: str) -> list[dict[str, Any]]:
+        """Helper to find books before starting a stream response."""
+        search_query = _normalize_query(text)
+        if search_query and len(search_query) > 2:
+            # Ưu tiên tìm theo Category trước vì mapping đã xử lý dịch thuật
+            books_qs = Book.objects.filter(
+                Q(category__name__icontains=search_query) |
+                Q(title__icontains=search_query) | 
+                Q(author__icontains=search_query)
+            )[:3]
+            return [
+                {
+                    "id": b.pk,
+                    "title": b.title,
+                    "price": f"{b.price:,.0f}₫",
+                    "url": f"/books/{b.pk}/",
+                    "image": b.cover_image if b.cover_image else None,
+                }
+                for b in books_qs
             ]
-            if book_lines:
-                prompt_parts.append(
-                    "Sách vừa gợi ý (dùng khi người dùng hỏi 'nội dung/chi tiết/giới thiệu'):\n"
-                    + "\n".join(book_lines)
-                )
-        if history_block:
-            prompt_parts.append("Lịch sử hội thoại:\n" + history_block)
-        prompt_parts.append(f"User: {text}\nAssistant:")
-        return "\n\n".join(prompt_parts)
+        return []
 
     def _handle_action(self, action_data: dict[str, Any]) -> dict[str, Any]:
         action = str(action_data.get("action", "")).strip().lower()
@@ -363,6 +414,31 @@ def _coerce_int(value: Any, default: int, min_value: int, max_value: int) -> int
 
 def _normalize_query(query: str) -> str:
     cleaned = query.lower().strip()
-    cleaned = re.sub(r"\b(tim|sach|co|khong|ve|cua|tac gia|muon|quyen|cuon|gia|re)\b", "", cleaned)
+    # Loại bỏ các từ dừng (stop words)
+    cleaned = re.sub(r"\b(tim|sach|co|khong|ve|cua|tac gia|muon|quyen|cuon|gia|re|cho|toi|loai|the|the loai)\b", "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    
+    # Ánh xạ từ khóa tiếng Việt sang tên Category trong DB (Thường là tiếng Anh)
+    mapping = {
+        "khoa học": "science",
+        "văn học": "fiction",
+        "viễn tưởng": "science fiction",
+        "bí ẩn": "mystery",
+        "trinh thám": "mystery",
+        "lập trình": "programming",
+        "công nghệ": "technology",
+        "kinh dị": "horror",
+        "lãng mạn": "romance",
+        "tình cảm": "romance",
+        "lịch sử": "history",
+        "kinh doanh": "business",
+        "kỹ năng": "self-help",
+        "thiếu nhi": "children",
+    }
+    
+    # Nếu từ khóa khớp với mapping, trả về giá trị mapped
+    for vn, en in mapping.items():
+        if vn in cleaned:
+            return en
+            
     return cleaned
