@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from books.models import Book, Category, Coupon, Order, OrderItem, ReadingProgress
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from books.category_utils import normalize_category_name
 from books.chatbot import BookieChatbot
 from books.ollama_client import OllamaError
@@ -236,6 +237,7 @@ class BasicFlowTest(TestCase):
     def test_dashboard_urls_reverse(self):
         names = [
             ("dashboard_users", []),
+            ("dashboard_user_set_role", [self.user.id]),
             ("dashboard_books", []),
             ("dashboard_book_create", []),
             ("dashboard_book_edit", [self.book.id]),
@@ -465,3 +467,72 @@ class SeedReaderContentCommandTest(TestCase):
         self.assertIn("Gutendex dang cham hoac loi mang", output.getvalue())
         self.assertEqual(Book.objects.count(), 0)
         self.assertTrue(Category.objects.filter(name="Kinh điển").exists())
+
+
+class RBACTest(TestCase):
+    def setUp(self):
+        call_command("seed_rbac")
+        self.client = Client()
+        self.customer = User.objects.create_user(username="customer", password="password123")
+        self.manager = User.objects.create_user(username="manager", password="password123", is_staff=True)
+        self.manager.groups.add(Group.objects.get(name="Manager"))
+        self.support = User.objects.create_user(username="support", password="password123", is_staff=True)
+        self.support.groups.add(Group.objects.get(name="Support"))
+        self.admin = User.objects.create_superuser(username="admin_role", password="password123")
+
+    def test_seed_rbac_uses_five_roles_without_accountant(self):
+        self.assertTrue(Group.objects.filter(name="Staff").exists())
+        self.assertTrue(Group.objects.filter(name="Manager").exists())
+        self.assertTrue(Group.objects.filter(name="Support").exists())
+        self.assertTrue(Group.objects.filter(name="Admin").exists())
+        self.assertFalse(Group.objects.filter(name="Accountant").exists())
+
+    def test_customer_cannot_access_dashboard(self):
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_manager_can_manage_books_but_not_users(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("dashboard_books"))
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(reverse("dashboard_users"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_support_can_view_orders_and_change_status(self):
+        order = Order.objects.create(user=self.customer, shipping_address="123 Test Street")
+        self.client.force_login(self.support)
+
+        response = self.client.get(reverse("dashboard_orders"))
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(
+            reverse("api_update_order_status", args=[order.pk]),
+            data={"status": "confirmed"},
+        )
+        self.assertEqual(response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.status, "confirmed")
+
+    def test_admin_can_assign_customer_role(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("dashboard_user_set_role", args=[self.manager.pk]),
+            data={"role": "Customer"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.manager.refresh_from_db()
+        self.assertFalse(self.manager.is_staff)
+        self.assertFalse(self.manager.groups.filter(name__in=["Staff", "Manager", "Support", "Admin"]).exists())
+
+    def test_admin_can_assign_manager_role(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("dashboard_user_set_role", args=[self.customer.pk]),
+            data={"role": "Manager"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.customer.refresh_from_db()
+        self.assertTrue(self.customer.is_staff)
+        self.assertTrue(self.customer.groups.filter(name="Manager").exists())

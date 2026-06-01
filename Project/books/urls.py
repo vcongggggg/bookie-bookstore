@@ -36,6 +36,7 @@ urlpatterns = [
     # Admin dashboard
     path("dashboard/", views.dashboard, name="dashboard"),
     path("dashboard/users/", views.dashboard_users, name="dashboard_users"),
+    path("dashboard/users/<int:pk>/role/", views.dashboard_user_set_role, name="dashboard_user_set_role"),
     path("dashboard/users/<int:pk>/toggle-staff/", views.dashboard_user_toggle_staff, name="dashboard_user_toggle_staff"),
     path("dashboard/users/<int:pk>/toggle-active/", views.dashboard_user_toggle_active, name="dashboard_user_toggle_active"),
     path("dashboard/books/", views.dashboard_books, name="dashboard_books"),

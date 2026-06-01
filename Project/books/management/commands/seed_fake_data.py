@@ -2,6 +2,7 @@ from decimal import Decimal
 from random import Random
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -22,11 +23,13 @@ from books.models import (
 
 
 FAKE_USERS = [
-    ("demo", "demo123", "demo@example.com", False, False),
-    ("admin", "admin123", "admin@example.com", True, True),
-    ("alice", "alice123", "alice@example.com", False, False),
-    ("bob", "bob123", "bob@example.com", False, False),
-    ("staff", "staff123", "staff@example.com", True, False),
+    ("demo", "demo123", "demo@example.com", "Customer"),
+    ("admin", "admin123", "admin@example.com", "Admin"),
+    ("alice", "alice123", "alice@example.com", "Customer"),
+    ("bob", "bob123", "bob@example.com", "Customer"),
+    ("staff", "staff123", "staff@example.com", "Staff"),
+    ("manager", "manager123", "manager@example.com", "Manager"),
+    ("support", "support123", "support@example.com", "Support"),
 ]
 
 FAKE_BOOKS = [
@@ -94,17 +97,21 @@ class Command(BaseCommand):
         }
 
         users = {}
-        for username, password, email, is_staff, is_superuser in FAKE_USERS:
+        internal_groups = Group.objects.filter(name__in=["Staff", "Manager", "Support", "Admin"])
+        for username, password, email, role in FAKE_USERS:
             user, _ = User.objects.get_or_create(
                 username=username,
-                defaults={"email": email, "is_staff": is_staff, "is_superuser": is_superuser, "is_active": True},
+                defaults={"email": email, "is_active": True},
             )
             user.email = email
-            user.is_staff = is_staff
-            user.is_superuser = is_superuser
+            user.groups.remove(*internal_groups)
+            user.is_staff = role != "Customer"
+            user.is_superuser = role == "Admin"
             user.is_active = True
             user.set_password(password)
             user.save()
+            if role != "Customer":
+                user.groups.add(Group.objects.get(name=role))
             users[username] = user
 
         for title, author, category_name, description, price, year, pages in FAKE_BOOKS:
@@ -154,6 +161,8 @@ class Command(BaseCommand):
             ("alice", "confirmed", "momo", physical_books[5:8], "Giao giờ hành chính.", "88 Lê Lợi, Đà Nẵng", "FREESHIP"),
             ("bob", "pending", "cod", physical_books[8:10] + digital_books[:1], "Gọi trước khi giao.", "45 Hai Bà Trưng, Hà Nội", None),
             ("staff", "packing", "vnpay", physical_books[10:13], "Đơn nội bộ test dashboard.", "Kho Bookie", "VIP20"),
+            ("manager", "confirmed", "cod", physical_books[13:15], "Đơn test manager.", "Văn phòng Bookie", None),
+            ("support", "shipping", "cod", physical_books[15:17], "Đơn test support.", "Quầy CSKH Bookie", None),
         ]
 
         for username, status, payment_method, selected_books, note, address, coupon_code in order_specs:
@@ -237,4 +246,7 @@ class Command(BaseCommand):
             f"Progress={ReadingProgress.objects.count()}, Coupons={Coupon.objects.count()}, "
             f"AuditLogs={AdminAuditLog.objects.count()}"
         )
-        self.stdout.write("Logins: demo/demo123, admin/admin123, alice/alice123, bob/bob123, staff/staff123")
+        self.stdout.write(
+            "Logins: demo/demo123, admin/admin123, alice/alice123, bob/bob123, "
+            "staff/staff123, manager/manager123, support/support123"
+        )

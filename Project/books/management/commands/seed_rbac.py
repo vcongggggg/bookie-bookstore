@@ -1,53 +1,14 @@
 from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand
 
-
-GROUP_PERMS = {
-    "Staff": [
-        "auth.view_user",
-        "books.view_book",
-        "books.view_coupon",
-        "books.view_order",
-        "books.view_orderitem",
-    ],
-    "Manager": [
-        "books.view_book",
-        "books.add_book",
-        "books.change_book",
-        "books.delete_book",
-    ],
-    "Accountant": [
-        "books.view_order",
-        "books.view_orderitem",
-        "books.view_coupon",
-    ],
-    "Support": [
-        "books.view_order",
-        "books.change_order",
-    ],
-    "Admin": [
-        "auth.view_user",
-        "auth.change_user",
-        "books.view_book",
-        "books.add_book",
-        "books.change_book",
-        "books.delete_book",
-        "books.view_coupon",
-        "books.add_coupon",
-        "books.change_coupon",
-        "books.delete_coupon",
-        "books.view_order",
-        "books.change_order",
-        "books.view_orderitem",
-        "books.view_adminauditlog",
-    ],
-}
+from books.rbac import GROUP_PERMS
 
 
 class Command(BaseCommand):
     help = "Create default RBAC groups and assign permissions."
 
     def handle(self, *args, **options):
+        Group.objects.filter(name="Accountant").delete()
         for group_name, perms in GROUP_PERMS.items():
             group, created = Group.objects.get_or_create(name=group_name)
             permissions = Permission.objects.filter(

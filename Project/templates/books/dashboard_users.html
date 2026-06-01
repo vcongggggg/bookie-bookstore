@@ -27,6 +27,7 @@
                     <th>Username</th>
                     <th>Email</th>
                     <th>Ten</th>
+                    <th>Role</th>
                     <th>Staff</th>
                     <th>Superuser</th>
                     <th>Active</th>
@@ -40,6 +41,9 @@
                     <td class="fw-semibold">{{ u.username }}</td>
                     <td>{{ u.email|default:"-" }}</td>
                     <td>{{ u.get_full_name|default:"-" }}</td>
+                    <td>
+                        <span class="badge-category">{{ u.primary_role }}</span>
+                    </td>
                     <td>{% if u.is_staff %}<span class="badge-category" style="background:rgba(0,184,148,.15);color:#00B894">Yes</span>{% else %}<span class="badge-category">No</span>{% endif %}</td>
                     <td>{% if u.is_superuser %}<span class="badge-category" style="background:rgba(108,92,231,.15);color:#6C5CE7">Yes</span>{% else %}<span class="badge-category">No</span>{% endif %}</td>
                     <td>{% if u.is_active %}<span class="badge-category" style="background:rgba(253,203,110,.2);color:#E17055">Active</span>{% else %}<span class="badge-category" style="background:rgba(225,112,85,.15);color:#E17055">Locked</span>{% endif %}</td>
@@ -47,9 +51,14 @@
                     <td class="text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             {% if perms.auth.change_user %}
-                            <form action="{% url 'dashboard_user_toggle_staff' u.pk %}" method="post">
+                            <form action="{% url 'dashboard_user_set_role' u.pk %}" method="post" class="d-flex gap-2">
                                 {% csrf_token %}
-                                <button class="btn btn-glass btn-sm" type="submit">Toggle staff</button>
+                                <select name="role" class="form-select form-select-sm" style="width:130px">
+                                    {% for role in role_choices %}
+                                    <option value="{{ role }}" {% if u.primary_role == role %}selected{% endif %}>{{ role }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="btn btn-glass btn-sm" type="submit">Set role</button>
                             </form>
                             <form action="{% url 'dashboard_user_toggle_active' u.pk %}" method="post">
                                 {% csrf_token %}

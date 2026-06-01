@@ -12,6 +12,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, F, Q, Sum
@@ -36,6 +37,7 @@ from .forms import (
 )
 from .models import AdminAuditLog, Book, Category, Coupon, Order, OrderItem, Rating, ReadingProgress, Wishlist
 from .ollama_client import OllamaClient, OllamaConfig, OllamaError
+from .rbac import INTERNAL_ROLES, ROLE_CHOICES, primary_role
 
 User = get_user_model()
 
@@ -1355,6 +1357,24 @@ def _require_perm(request: HttpRequest, perm: str, redirect_name: str) -> bool:
     return False
 
 
+def _assign_role(user, role: str) -> None:
+    if role not in ROLE_CHOICES:
+        raise ValueError("Invalid role")
+    managed_groups = Group.objects.filter(name__in=INTERNAL_ROLES)
+    user.groups.remove(*managed_groups)
+    if role == "Customer":
+        user.is_staff = False
+        user.is_superuser = False
+        user.save(update_fields=["is_staff", "is_superuser"])
+        return
+
+    group = Group.objects.get(name=role)
+    user.groups.add(group)
+    user.is_staff = True
+    user.is_superuser = role == "Admin"
+    user.save(update_fields=["is_staff", "is_superuser"])
+
+
 def _log_admin_action(
     request: HttpRequest,
     action: str,
@@ -1384,11 +1404,35 @@ def dashboard_users(request: HttpRequest) -> HttpResponse:
             | Q(first_name__icontains=query)
             | Q(last_name__icontains=query)
         )
+    user_rows = []
+    for item in users_qs.order_by("-date_joined")[:200]:
+        item.primary_role = primary_role(item)
+        user_rows.append(item)
     return render(
         request,
         "books/dashboard_users.html",
-        {"users": users_qs.order_by("-date_joined")[:200], "query": query},
+        {"users": user_rows, "query": query, "role_choices": ROLE_CHOICES},
     )
+
+
+@staff_member_required
+@require_POST
+def dashboard_user_set_role(request: HttpRequest, pk: int) -> HttpResponse:
+    if not _require_perm(request, "auth.change_user", "dashboard_users"):
+        return redirect("dashboard_users")
+    target = get_object_or_404(User, pk=pk)
+    role = request.POST.get("role", "").strip()
+    if target.pk == request.user.pk or target.is_superuser:
+        messages.error(request, "Khong the thay doi role cua tai khoan nay.")
+        return redirect("dashboard_users")
+    try:
+        _assign_role(target, role)
+    except (Group.DoesNotExist, ValueError):
+        messages.error(request, "Role khong hop le.")
+        return redirect("dashboard_users")
+    _log_admin_action(request, "set_role", "user", target.pk, {"role": role})
+    messages.success(request, f"Da cap nhat role {role} cho {target.username}.")
+    return redirect("dashboard_users")
 
 
 @staff_member_required
@@ -1400,9 +1444,9 @@ def dashboard_user_toggle_staff(request: HttpRequest, pk: int) -> HttpResponse:
     if target.pk == request.user.pk or target.is_superuser:
         messages.error(request, "Khong the thay doi quyen tai khoan nay.")
         return redirect("dashboard_users")
-    target.is_staff = not target.is_staff
-    target.save(update_fields=["is_staff"])
-    _log_admin_action(request, "toggle_staff", "user", target.pk, {"is_staff": target.is_staff})
+    next_role = "Customer" if target.is_staff else "Staff"
+    _assign_role(target, next_role)
+    _log_admin_action(request, "toggle_staff", "user", target.pk, {"role": next_role})
     messages.success(request, f"Da cap nhat quyen staff cho {target.username}.")
     return redirect("dashboard_users")
 
