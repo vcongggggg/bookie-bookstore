@@ -1,77 +1,77 @@
-# Bookie Project Status And Web Test Plan
+# Thống Kê Project Bookie Và Kế Hoạch Kiểm Thử Web
 
-## 1. Project Scope
+## 1. Phạm Vi Project
 
-Bookie is a Django bookstore web application. The active source code lives in `Project/`.
+Bookie là website bán sách xây bằng Django. Toàn bộ mã nguồn đang dùng để chạy web nằm trong thư mục `Project/`.
 
-Main goal: provide a usable online bookstore experience with catalog browsing, cart/checkout, orders, user profile, admin dashboard, light AI assistance, and optional digital reading.
+Mục tiêu chính của project là tạo một trải nghiệm nhà sách trực tuyến dùng được trong thực tế: duyệt sách, xem chi tiết, giỏ hàng, thanh toán, đơn hàng, hồ sơ người dùng, dashboard quản trị, chatbot hỗ trợ vừa đủ, và đọc sách số nếu sách có nội dung ebook.
 
-Current source layout:
+Cấu trúc mã nguồn hiện tại:
 
-- `Project/books/`: main app, models, views, URLs, forms, chatbot, tests, seed commands.
-- `Project/bookstore/`: Django settings and root URL config.
-- `Project/templates/`: HTML pages.
-- `Project/static/`: CSS, JavaScript, and images.
-- `Project/.env.example`: safe environment template.
-- `Project/requirements.txt`: Python dependencies.
+- `Project/books/`: app chính, gồm models, views, URLs, forms, chatbot, tests và seed commands.
+- `Project/bookstore/`: cấu hình Django và root URL config.
+- `Project/templates/`: giao diện HTML.
+- `Project/static/`: CSS, JavaScript và hình ảnh.
+- `Project/.env.example`: file mẫu cấu hình môi trường an toàn.
+- `Project/requirements.txt`: danh sách thư viện Python.
 
-## 2. Main Data Models
+## 2. Các Model Dữ Liệu Chính
 
-- `Category`: book categories.
-- `Book`: catalog item, stock, price, cover URL, digital book fields.
-- `ReadingProgress`: per-user digital reading progress.
-- `Wishlist`: user saved books.
-- `Coupon`: discount code with validity rules.
-- `Order`: checkout/order lifecycle and payment method.
-- `OrderItem`: books purchased in an order, including digital-purchase flag.
-- `Rating`: user rating and review.
-- `AdminAuditLog`: staff/admin actions.
+- `Category`: thể loại sách.
+- `Book`: sách trong catalog, gồm giá, tồn kho, ảnh bìa, thông tin ebook.
+- `ReadingProgress`: tiến độ đọc ebook theo từng người dùng.
+- `Wishlist`: danh sách sách yêu thích của người dùng.
+- `Coupon`: mã giảm giá, điều kiện áp dụng và giới hạn lượt dùng.
+- `Order`: đơn hàng, trạng thái đơn hàng và phương thức thanh toán.
+- `OrderItem`: từng sách trong đơn hàng, có đánh dấu mua bản digital hay không.
+- `Rating`: đánh giá và bình luận của người dùng.
+- `AdminAuditLog`: nhật ký thao tác của staff/admin.
 
-## 3. Current Features
+## 3. Chức Năng Hiện Có
 
-### Public/User Features
+### Chức Năng Cho Người Dùng
 
-- Home page with featured/popular/recommended book sections.
-- Book listing with search, category filter, and sorting.
-- Book detail page with description, stock state, ratings, related books, and wishlist/cart actions.
-- Category list and category detail pages.
-- User registration, login, logout.
-- Cart add/update/remove.
-- Checkout with shipping address, note, coupon, and payment method.
-- Order list and order detail.
-- Order cancellation while pending/confirmed.
-- PDF invoice download for owned orders.
-- Wishlist page and AJAX wishlist add/remove.
-- Profile page and profile edit.
-- Reading DNA page with stats, charts, milestones, and recommendations.
-- Digital reader with preview/full access and reading-progress save.
-- About and contact pages.
+- Trang chủ với các khu vực sách nổi bật, phổ biến và gợi ý.
+- Danh sách sách có tìm kiếm, lọc theo thể loại và sắp xếp.
+- Trang chi tiết sách: mô tả, tồn kho, giá, đánh giá, sách liên quan, thêm giỏ hàng/yêu thích.
+- Danh sách thể loại và trang chi tiết thể loại.
+- Đăng ký, đăng nhập, đăng xuất.
+- Giỏ hàng: thêm, cập nhật số lượng, xóa sản phẩm.
+- Checkout với địa chỉ giao hàng, ghi chú, mã giảm giá và phương thức thanh toán.
+- Danh sách đơn hàng và chi tiết đơn hàng.
+- Hủy đơn khi đơn còn ở trạng thái chờ/xác nhận.
+- Tải hóa đơn PDF cho đơn hàng thuộc tài khoản đang đăng nhập.
+- Wishlist và thao tác thêm/xóa yêu thích bằng AJAX.
+- Hồ sơ người dùng và chỉnh sửa thông tin cá nhân.
+- Reading DNA: thống kê thói quen đọc, biểu đồ, thành tựu và gợi ý.
+- Trình đọc ebook: preview/full access và lưu tiến độ đọc.
+- Trang giới thiệu và liên hệ.
 
-### Commerce/Admin Features
+### Chức Năng Thương Mại Và Quản Trị
 
-- Coupon validation endpoint.
+- API kiểm tra mã giảm giá.
 - Mock payment confirmation.
-- VNPay return/callback path and VNPay helper module.
-- Admin dashboard summary: revenue, orders, users, books, charts/lists.
-- Staff dashboard pages for users, books, coupons, orders, audit logs.
-- CSV exports for books and orders.
-- Order status update API for staff with permission.
-- RBAC seed command for default staff groups.
+- Đường dẫn callback/return cho VNPay và module helper VNPay.
+- Dashboard admin tổng quan: doanh thu, đơn hàng, người dùng, sách, biểu đồ/danh sách.
+- Trang dashboard cho staff: quản lý người dùng, sách, coupon, đơn hàng, audit log.
+- Xuất CSV sách và đơn hàng.
+- API cập nhật trạng thái đơn hàng cho staff có quyền.
+- Seed command tạo nhóm quyền RBAC mặc định.
 
-### AI/Chatbot Features
+### Chức Năng AI/Chatbot
 
-The chatbot is intentionally kept "good enough" and not treated as the core system.
+Chatbot được định hướng là tính năng hỗ trợ vừa đủ, không phải lõi chính của project.
 
-- Ollama-backed chatbot endpoint.
-- Streaming chatbot endpoint.
-- Database-grounded book lookup before model response.
-- Order lookup / recommendation actions through chatbot response handling.
-- Rate limit on chatbot sync and stream endpoints.
-- Fallback response when the model fails.
+- Endpoint chatbot dùng Ollama.
+- Endpoint chatbot streaming.
+- Tìm sách trong database trước khi gọi model để giảm việc bịa nội dung.
+- Hỗ trợ một số tác vụ như tra cứu đơn hàng/gợi ý sách.
+- Rate limit cho cả chatbot thường và chatbot streaming.
+- Có fallback khi model lỗi hoặc không kết nối được.
 
-## 4. Setup And Run
+## 4. Cách Cài Đặt Và Chạy Project
 
-From repository root:
+Từ thư mục gốc repository:
 
 ```powershell
 cd Project
@@ -84,18 +84,18 @@ python manage.py seed_rbac
 python manage.py runserver
 ```
 
-Useful demo account:
+Tài khoản demo hữu ích:
 
 - Username: `demo`
 - Password: `demo123`
 
-Optional digital books:
+Seed thêm sách digital nếu cần test reader:
 
 ```powershell
 python manage.py seed_reader_content
 ```
 
-Run commands from repository root if preferred:
+Nếu muốn chạy lệnh từ root repo:
 
 ```powershell
 python Project\manage.py check
@@ -103,209 +103,222 @@ python Project\manage.py test books
 python Project\manage.py runserver
 ```
 
-## 5. Automated Test Status
+## 5. Trạng Thái Test Tự Động
 
-Current automated test command:
+Lệnh test chính:
 
 ```powershell
 python Project\manage.py test books
 ```
 
-Current baseline: `12 tests OK`.
+Baseline hiện tại: `15 tests OK`.
 
-Covered by automated tests:
+Lệnh coverage:
 
-- Home page loads.
-- Book detail page loads.
-- Digital reader loads for a free digital book.
-- Reading progress API saves page/finished state.
-- Non-digital books redirect away from reader.
-- Paid digital books show preview before purchase and full access after digital purchase.
-- Digital checkout marks `OrderItem.is_digital_purchase` and does not reduce stock.
-- Dashboard route names reverse successfully.
-- Reading DNA supplies chart data and insight context.
-- Order detail links invoice PDF.
-- Invoice PDF download requires owner and returns valid PDF response.
-- Chatbot sync endpoint rate limits repeated requests.
-- Chatbot stream endpoint shares chatbot rate limit.
+```powershell
+coverage run Project\manage.py test books
+coverage report --fail-under=35
+```
 
-Not fully covered yet:
+Coverage gần nhất: khoảng `48%`, vượt ngưỡng CI hiện tại là `35%`.
 
-- Full browser UI rendering and responsive visual checks.
-- AJAX wishlist/cart DOM updates.
-- Coupon edge cases such as expired/max-used coupons.
-- Staff permission matrix for all dashboard actions.
-- VNPay checksum success/failure paths.
-- Real Ollama integration behavior.
-- PDF visual layout quality.
+Các phần đã có test tự động:
 
-## 6. Manual Web Test Checklist
+- Trang chủ load thành công.
+- Trang chi tiết sách load thành công.
+- Reader mở được với sách digital miễn phí.
+- API lưu tiến độ đọc lưu đúng trang và trạng thái hoàn thành.
+- Sách không phải digital bị redirect khỏi reader.
+- Sách digital trả phí hiển thị preview trước khi mua và full access sau khi mua digital.
+- Checkout digital đánh dấu `OrderItem.is_digital_purchase` và không trừ tồn kho.
+- Checkout sách giấy trừ tồn kho đúng theo số lượng.
+- Coupon hợp lệ giảm tổng tiền và tăng số lượt dùng.
+- Coupon không hợp lệ không chặn checkout và không giảm tiền.
+- Các route dashboard reverse được.
+- Reading DNA cấp đủ dữ liệu biểu đồ và insight.
+- Trang chi tiết đơn hàng có link tải hóa đơn PDF.
+- Tải hóa đơn PDF yêu cầu đúng chủ đơn hàng và trả response PDF hợp lệ.
+- Chatbot thường bị rate limit khi gửi quá nhanh.
+- Chatbot streaming dùng chung rate limit.
 
-Use this checklist after starting the server at `http://127.0.0.1:8000/`.
+Các phần chưa được test tự động đầy đủ:
 
-### Smoke Navigation
+- Render UI trên browser thật và responsive/mobile layout.
+- DOM update của AJAX wishlist/cart.
+- Coupon hết hạn, coupon vượt max uses, coupon dưới min order.
+- Ma trận quyền staff/admin cho mọi thao tác dashboard.
+- Luồng VNPay checksum thành công/thất bại.
+- Tích hợp Ollama thật.
+- Chất lượng trình bày trực quan của file PDF.
 
-- Open `/`.
-- Confirm header/nav render without broken layout.
+## 6. Checklist Test Thủ Công Trên Web
+
+Dùng checklist này sau khi chạy server tại `http://127.0.0.1:8000/`.
+
+### Kiểm Tra Điều Hướng Cơ Bản
+
+- Mở `/`.
+- Kiểm tra header/nav hiển thị không vỡ layout.
 - Click `Books`, `Categories`, `About`, `Contact`.
-- Search from the header and confirm suggestions/results appear.
-- Resize browser to mobile width and check nav/chatbot do not overlap core content.
+- Tìm kiếm từ header và xác nhận có gợi ý/kết quả.
+- Thu nhỏ trình duyệt về kích thước mobile và kiểm tra nav/chatbot không che nội dung chính.
 
-### Catalog And Book Detail
+### Catalog Và Chi Tiết Sách
 
-- Open `/books/`.
-- Test search by book title and author.
-- Test category filter.
-- Test sort options.
-- Open a book detail page.
-- Confirm cover/placeholder, price, stock, rating area, related books, and CTA buttons render.
-- Try out-of-stock book if available and confirm add-to-cart is disabled or blocked.
+- Mở `/books/`.
+- Tìm kiếm theo tên sách và tác giả.
+- Lọc theo thể loại.
+- Thử các tùy chọn sắp xếp.
+- Mở một trang chi tiết sách.
+- Kiểm tra ảnh bìa/placeholder, giá, tồn kho, khu vực đánh giá, sách liên quan và các nút CTA.
+- Nếu có sách hết hàng, thử thêm vào giỏ và xác nhận bị chặn hoặc nút bị disable.
 
-### Cart And Checkout
+### Giỏ Hàng Và Checkout
 
-- Add a physical book to cart.
-- Update quantity in `/cart/`.
-- Remove item from cart.
-- Add a digital book to cart and confirm quantity stays `1`.
-- Checkout as logged-in user.
-- Enter shipping address and COD payment.
-- Confirm order is created and cart clears.
-- Confirm physical stock decreases after physical checkout.
-- Confirm digital checkout does not decrease stock.
+- Thêm sách giấy vào giỏ.
+- Cập nhật số lượng tại `/cart/`.
+- Xóa sản phẩm khỏi giỏ.
+- Thêm sách digital vào giỏ và xác nhận số lượng luôn là `1`.
+- Checkout khi đã đăng nhập.
+- Nhập địa chỉ giao hàng và chọn COD.
+- Xác nhận đơn hàng được tạo và giỏ hàng được xóa.
+- Xác nhận checkout sách giấy làm giảm tồn kho.
+- Xác nhận checkout sách digital không làm giảm tồn kho.
 
-### Coupons
+### Coupon
 
-- Create a coupon in admin/dashboard or Django admin.
-- Apply valid coupon during checkout.
-- Try invalid coupon code and confirm friendly error.
-- Try coupon below minimum order if configured.
-- Confirm order total reflects discount.
+- Tạo coupon trong dashboard/admin hoặc Django admin.
+- Áp dụng coupon hợp lệ khi checkout.
+- Nhập coupon sai và xác nhận thông báo thân thiện.
+- Thử coupon chưa đủ giá trị đơn tối thiểu nếu có cấu hình.
+- Xác nhận tổng tiền đơn hàng phản ánh đúng giảm giá.
 
-### Orders And Invoice
+### Đơn Hàng Và Hóa Đơn
 
-- Open `/orders/`.
-- Open an order detail page.
-- Confirm status timeline, items, address, totals.
-- Download invoice PDF.
-- Confirm browser downloads/opens a PDF.
-- Try accessing another user's invoice URL and confirm access is denied.
-- Cancel a pending/confirmed order and confirm stock is restored for physical items.
+- Mở `/orders/`.
+- Mở một trang chi tiết đơn hàng.
+- Kiểm tra timeline trạng thái, danh sách sản phẩm, địa chỉ và tổng tiền.
+- Tải hóa đơn PDF.
+- Xác nhận browser tải/mở được file PDF.
+- Thử truy cập URL hóa đơn của user khác và xác nhận bị từ chối.
+- Hủy đơn đang chờ/xác nhận và xác nhận tồn kho sách giấy được hoàn lại.
 
-### Payment
+### Thanh Toán
 
-- Checkout with Momo mock.
-- Confirm payment page renders QR/mock instructions.
-- Click confirm payment and verify order status becomes confirmed.
-- Checkout with VNPay sandbox only if env vars are configured.
-- Test VNPay failure/success callback separately when sandbox credentials are valid.
+- Checkout với Momo mock.
+- Kiểm tra trang payment hiển thị QR/hướng dẫn mock.
+- Click xác nhận thanh toán và kiểm tra trạng thái đơn thành confirmed.
+- Checkout với VNPay sandbox chỉ khi đã cấu hình env vars.
+- Test callback VNPay thành công/thất bại riêng khi có credential sandbox hợp lệ.
 
 ### Wishlist
 
-- Add a book to wishlist from detail/list if button exists.
-- Confirm wishlist badge/count changes.
-- Open `/wishlist/`.
-- Remove item and confirm it disappears.
-- Confirm unauthenticated wishlist actions redirect or show login requirement.
+- Thêm sách vào wishlist từ trang list/detail nếu có nút.
+- Xác nhận badge/count wishlist thay đổi.
+- Mở `/wishlist/`.
+- Xóa sách khỏi wishlist và xác nhận item biến mất.
+- Thử thao tác wishlist khi chưa đăng nhập và xác nhận yêu cầu đăng nhập/redirect phù hợp.
 
-### Ratings And Sentiment
+### Rating Và Sentiment
 
-- Open a purchased/read book if rating is allowed by current UI.
-- Submit a 1-5 star rating and comment.
-- Confirm rating displays on book detail.
-- Confirm sentiment summary percentages do not break layout.
+- Mở sách có thể đánh giá.
+- Gửi rating 1-5 sao và bình luận.
+- Xác nhận rating hiển thị ở trang chi tiết sách.
+- Xác nhận khu vực sentiment summary không làm vỡ layout.
 
-### Profile And Reading DNA
+### Profile Và Reading DNA
 
-- Open `/profile/`.
-- Edit first name, last name, email.
-- Open `/profile/reading-dna/`.
-- Confirm stats cards render.
-- Confirm radar and trend charts render.
-- Confirm milestones/recommendations render if enough data exists.
-- Confirm empty-state renders for a new user with no orders/ratings.
+- Mở `/profile/`.
+- Chỉnh sửa họ, tên, email.
+- Mở `/profile/reading-dna/`.
+- Xác nhận các stat card hiển thị.
+- Xác nhận radar chart và trend chart hiển thị.
+- Xác nhận milestones/recommendations hiển thị khi user có đủ dữ liệu.
+- Với user mới chưa có đơn/đánh giá, xác nhận empty-state hiển thị đúng.
 
 ### Digital Reader
 
-- Open a digital book detail page.
-- Click read/reader button.
-- For a free digital book, confirm full content opens.
-- For a paid digital book before purchase, confirm preview mode.
-- Purchase digital format and confirm full reader access.
-- Use next/previous page buttons.
-- Refresh reader and confirm progress resumes.
-- Confirm font-size slider and theme button work.
-- Confirm "Ask AI" opens/sends page context without breaking reader.
+- Mở chi tiết một sách digital.
+- Click nút đọc sách.
+- Với sách digital miễn phí, xác nhận mở được full content.
+- Với sách digital trả phí chưa mua, xác nhận chỉ xem preview.
+- Mua bản digital và xác nhận mở được full reader.
+- Dùng nút next/previous page.
+- Refresh reader và xác nhận tiến độ đọc được khôi phục.
+- Kiểm tra slider cỡ chữ và nút theme.
+- Kiểm tra nút "Ask AI" không làm vỡ reader.
 
 ### Chatbot
 
-- Open chatbot bubble.
-- Ask for a broad recommendation, e.g. "goi y sach lap trinh".
-- Confirm response is friendly and does not invent irrelevant products too aggressively.
-- Ask for order status while logged out and logged in.
-- Confirm fallback message appears if Ollama is unavailable.
-- Send many requests quickly and confirm rate limit message appears.
-- Check chatbot does not cover critical mobile controls.
+- Mở chatbot bubble.
+- Hỏi gợi ý chung, ví dụ: `goi y sach lap trinh`.
+- Xác nhận câu trả lời thân thiện và không bịa quá đà.
+- Hỏi trạng thái đơn hàng khi chưa đăng nhập và khi đã đăng nhập.
+- Tắt Ollama hoặc để Ollama unavailable và xác nhận có fallback message.
+- Gửi nhiều request nhanh và xác nhận rate limit xuất hiện.
+- Kiểm tra chatbot không che các nút quan trọng trên mobile.
 
 ### Admin Dashboard
 
-- Create staff/admin user or assign groups with `seed_rbac`.
-- Open `/dashboard/`.
-- Confirm staff-only access.
-- Check dashboard stats and charts.
-- Open user, book, coupon, order, audit pages.
-- Test book create/edit/delete with correct permission.
-- Test coupon create/edit/delete with correct permission.
-- Test order status update.
+- Tạo staff/admin hoặc gán nhóm quyền bằng `seed_rbac`.
+- Mở `/dashboard/`.
+- Xác nhận chỉ staff mới truy cập được.
+- Kiểm tra số liệu và biểu đồ dashboard.
+- Mở các trang users, books, coupons, orders, audit.
+- Test thêm/sửa/xóa sách với quyền phù hợp.
+- Test thêm/sửa/xóa coupon với quyền phù hợp.
+- Test cập nhật trạng thái đơn hàng.
 - Export orders CSV.
 - Export books CSV.
-- Confirm audit logs are recorded for admin actions.
+- Xác nhận audit log được ghi khi thao tác admin.
 
-## 7. UX/UI Review Notes
+## 7. Nhận Xét UX/UI
 
-Current strengths:
+Điểm mạnh hiện tại:
 
-- Rich visual identity with Midnight Cosmic styling.
-- Main flows are discoverable: catalog, detail, cart, checkout, orders.
-- Dashboard covers core admin operations.
-- Reader mode is present and test-covered.
-- Chatbot is present but scoped as helper, not the main product.
+- Có nhận diện visual rõ với phong cách Midnight Cosmic.
+- Flow chính khá dễ hiểu: catalog, detail, cart, checkout, orders.
+- Dashboard đã bao phủ các nghiệp vụ quản trị chính.
+- Reader mode đã có và có test bảo vệ.
+- Chatbot có mặt như trợ lý phụ, không lấn át web bán sách.
 
-Known improvement areas:
+Điểm cần cải thiện:
 
-- Many templates still use inline styles, making consistency harder to maintain.
-- Some Vietnamese text appears without full accents in admin/dashboard areas.
-- Chatbot frontend renders limited HTML formatting and should avoid unsafe text rendering patterns.
-- Some AJAX flows need browser-level tests, not only Django unit tests.
-- Payment sandbox should be tested with real sandbox credentials before demo.
-- PDF invoice is functional but visually simple.
+- Nhiều template còn dùng inline style, khó duy trì đồng bộ UI.
+- Một số text tiếng Việt ở dashboard/admin chưa có dấu đầy đủ.
+- Frontend chatbot có render một ít HTML từ text, cần harden để tránh pattern không an toàn.
+- Một số flow AJAX cần test ở browser thật, không chỉ test Django.
+- Thanh toán sandbox cần test với credential thật trước khi demo.
+- Hóa đơn PDF đã dùng được nhưng còn đơn giản về mặt trình bày.
 
-## 8. Code Quality Notes
+## 8. Nhận Xét Code Quality
 
-Current good points:
+Điểm tốt hiện tại:
 
-- `.env` is ignored; `.env.example` is committed.
-- Root duplicate Django tree was removed; `Project/` is the source of truth.
-- Test database uses SQLite automatically for tests.
-- Core hardening checks pass with `python Project\manage.py check`.
-- Feature work has been committed on separate branches and merged after tests pass.
+- `.env` đã được ignore; `.env.example` đã commit.
+- Cây Django trùng ở root đã được xóa; `Project/` là source of truth.
+- Test database tự dùng SQLite khi chạy test.
+- `python Project\manage.py check` pass.
+- Đã có GitHub Actions chạy check/test/coverage.
+- Các thay đổi gần đây đều đi theo branch riêng, có test rồi mới merge.
 
-Known code smells/risk areas:
+Sạn/rủi ro còn lại:
 
-- `Project/books/views.py` is large and should eventually be split by domain.
-- A legacy `api_chatbot_sync_unused` function remains and can be removed in a cleanup commit.
-- Some endpoints use `csrf_exempt`; review whether frontend can use normal CSRF protection.
-- Broad `except Exception` blocks should be narrowed where possible.
-- Dashboard permission tests should be expanded.
+- `Project/books/views.py` đang rất lớn, về lâu dài nên tách theo domain.
+- Hàm legacy `api_chatbot_sync_unused` vẫn còn và nên xóa trong cleanup commit.
+- Một số endpoint đang dùng `csrf_exempt`; cần review xem có thể bỏ không.
+- Nhiều `except Exception` còn bắt rộng, nên thu hẹp dần.
+- Test permission dashboard cần mở rộng.
 
-## 9. Recommended Next Work
+## 9. Việc Nên Làm Tiếp
 
-Do not add major new features until these are improved:
+Chưa nên thêm feature lớn nếu các phần dưới đây chưa ổn hơn:
 
-1. Add tests for coupon validity and checkout totals.
-2. Add tests for dashboard permissions and admin actions.
-3. Remove dead chatbot fallback code.
-4. Harden chatbot frontend rendering.
-5. Review CSRF exemptions and remove unnecessary ones.
-6. Polish key templates for mobile layout and text consistency.
-7. Run a manual browser pass through the checklist above.
+1. Mở rộng test cho permission dashboard và admin actions.
+2. Xóa dead code chatbot fallback.
+3. Harden frontend chatbot rendering.
+4. Review và bỏ `csrf_exempt` không cần thiết.
+5. Polish các template quan trọng cho mobile layout và text tiếng Việt.
+6. Chạy manual browser pass theo checklist ở trên.
+7. Nếu có thời gian, thêm browser/e2e test cho cart, checkout, wishlist.
 
