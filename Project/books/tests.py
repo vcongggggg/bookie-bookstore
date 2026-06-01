@@ -3,12 +3,14 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.cache import cache
+from django.core.management import call_command
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from books.models import Book, Category, Coupon, Order, OrderItem, ReadingProgress
 from django.contrib.auth import get_user_model
+from books.category_utils import normalize_category_name
 
 User = get_user_model()
 
@@ -299,3 +301,55 @@ class BasicFlowTest(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 429)
+
+
+class CategoryNormalizationTest(TestCase):
+    def test_normalize_category_name_uses_vietnamese_display_names(self):
+        cases = {
+            "fiction": "Văn học",
+            "Programming": "Lập trình",
+            "science": "Khoa học",
+            "romance": "Lãng mạn",
+            "mystery": "Trinh thám",
+            "Kinh điển": "Kinh điển",
+            "  custom_topic  ": "Custom Topic",
+        }
+
+        for raw_name, expected_name in cases.items():
+            with self.subTest(raw_name=raw_name):
+                self.assertEqual(normalize_category_name(raw_name), expected_name)
+
+    def test_normalize_categories_command_renames_and_merges_existing_data(self):
+        old_fiction = Category.objects.create(name="fiction")
+        existing_vietnamese = Category.objects.create(name="Văn học")
+        programming = Category.objects.create(name="programming")
+        fiction_book = Book.objects.create(
+            title="Old Fiction",
+            author="Author",
+            price=100,
+            category=old_fiction,
+        )
+        existing_book = Book.objects.create(
+            title="Existing Fiction",
+            author="Author",
+            price=100,
+            category=existing_vietnamese,
+        )
+        programming_book = Book.objects.create(
+            title="Code Book",
+            author="Author",
+            price=100,
+            category=programming,
+        )
+
+        call_command("normalize_categories")
+
+        self.assertFalse(Category.objects.filter(name="fiction").exists())
+        self.assertFalse(Category.objects.filter(name="programming").exists())
+        self.assertTrue(Category.objects.filter(name="Lập trình").exists())
+        fiction_book.refresh_from_db()
+        existing_book.refresh_from_db()
+        programming_book.refresh_from_db()
+        self.assertEqual(fiction_book.category.name, "Văn học")
+        self.assertEqual(existing_book.category.name, "Văn học")
+        self.assertEqual(programming_book.category.name, "Lập trình")

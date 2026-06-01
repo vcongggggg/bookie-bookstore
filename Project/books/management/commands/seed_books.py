@@ -11,6 +11,7 @@ import urllib.request
 
 from django.core.management.base import BaseCommand
 
+from books.category_utils import normalize_category_name
 from books.models import Book, Category
 
 
@@ -101,7 +102,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"  SKIP {subject}: {e}"))
                 continue
 
-            name = data.get("name") or subject.replace("_", " ").title()
+            name = normalize_category_name(data.get("name") or subject)
             category, _ = Category.objects.get_or_create(name=name)
             works = data.get("works") or []
 
