@@ -28,7 +28,7 @@ from .forms import (
     RatingForm,
     RegisterForm,
 )
-from .models import AdminAuditLog, Book, Category, Coupon, Order, OrderItem, Rating, Wishlist
+from .models import AdminAuditLog, Book, Category, Coupon, Order, OrderItem, Rating, ReadingProgress, Wishlist
 from .ollama_client import OllamaClient, OllamaConfig
 
 User = get_user_model()
@@ -55,30 +55,29 @@ def _cart_items(request):
     cart = _get_cart(request)
     if not cart:
         return []
-        
-    # Extract book IDs from keys (support both "1" and "1_physical")
     book_ids = []
-    for k in cart.keys():
-        book_ids.append(int(k.split('_')[0]))
-        
+    for key in cart.keys():
+        try:
+            book_ids.append(int(str(key).split("_")[0]))
+        except (TypeError, ValueError):
+            continue
+
     books = Book.objects.filter(pk__in=set(book_ids))
-    book_map = {str(b.pk): b for b in books}
-    
+    book_map = {str(book.pk): book for book in books}
     items = []
-    for k, qty in cart.items():
-        parts = k.split('_')
-        b_id = parts[0]
+    for key, qty in cart.items():
+        parts = str(key).split("_")
+        book = book_map.get(parts[0])
+        if not book:
+            continue
         book_format = parts[1] if len(parts) > 1 else "physical"
-        
-        b = book_map.get(b_id)
-        if b:
-            items.append({
-                "book": b,
-                "quantity": qty,
-                "subtotal": b.price * qty,
-                "format": book_format,
-                "key": k,
-            })
+        items.append({
+            "book": book,
+            "quantity": qty,
+            "subtotal": book.price * qty,
+            "format": book_format,
+            "key": str(key),
+        })
     return items
 
 
@@ -474,14 +473,12 @@ def cart_view(request):
 
 def add_to_cart(request, book_id: int):
     book = get_object_or_404(Book, pk=book_id)
-    
-    # Get the requested format (default to physical)
+
     book_format = request.POST.get("format", "physical")
     if book_format == "digital" and not book.is_digital:
         messages.error(request, "Sách này không có bản E-book.")
         return redirect("book_detail", pk=book.pk)
 
-    # Check stock only for physical books
     if book_format == "physical" and not book.in_stock:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse({"status": "error", "message": f"'{book.title}' đã hết hàng."})
@@ -489,12 +486,8 @@ def add_to_cart(request, book_id: int):
         return redirect("book_detail", pk=book.pk)
 
     cart = _get_cart(request)
-    
-    # Create a unique key based on format
     key = f"{book.pk}_{book_format}"
-    
     if book_format == "digital":
-        qty = 1 # E-books only need 1 copy
         new_qty = 1
     else:
         qty = request.POST.get("quantity") or request.GET.get("quantity") or 1
@@ -512,21 +505,19 @@ def add_to_cart(request, book_id: int):
     # AJAX response
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         cart_total = sum(cart.values())
-        format_str = "E-book" if book_format == "digital" else "sách giấy"
+        format_label = "E-book" if book_format == "digital" else "sách giấy"
         return JsonResponse({
             "status": "ok",
-            "message": f"Đã thêm bản {format_str} của '{book.title}' vào giỏ.",
+            "message": f"Đã thêm bản {format_label} của '{book.title}' vào giỏ hàng.",
             "cart_count": cart_total,
         })
 
-    format_str = "E-book" if book_format == "digital" else "sách giấy"
-    messages.success(request, f"Đã thêm bản {format_str} của '{book.title}' vào giỏ.")
-    
+    format_label = "E-book" if book_format == "digital" else "sách giấy"
+    messages.success(request, f"Đã thêm bản {format_label} của '{book.title}' vào giỏ.")
     next_url = request.GET.get("next") or request.POST.get("next") or "book_detail"
     if next_url == "book_detail":
         return redirect("book_detail", pk=book.pk)
     return redirect("cart")
-
 
 
 def update_cart(request):
@@ -605,10 +596,8 @@ def checkout(request):
                     book=row["book"],
                     quantity=row["quantity"],
                     price=row["book"].price,
-                    is_digital_purchase=is_digital
+                    is_digital_purchase=is_digital,
                 )
-                
-                # Decrease stock ONLY for physical books
                 if not is_digital:
                     book = row["book"]
                     book.stock = max(0, book.stock - row["quantity"])
@@ -961,7 +950,7 @@ def _get_book_sentiment_summary(book):
 
 
 def _get_user_reading_dna(user):
-    """Analyze user's reading preferences and build an advanced 'Reading DNA' profile with chart data."""
+    """Analyze user's reading preferences and build a 'Reading DNA' profile."""
     orders = OrderItem.objects.filter(order__user=user).select_related("book__category")
     ratings = Rating.objects.filter(user=user).select_related("book__category")
 
@@ -970,44 +959,25 @@ def _get_user_reading_dna(user):
 
     dna = {}
 
-    # 1. Category preferences (For Radar Chart)
+    # Category preferences
     cat_counter = Counter()
     for item in orders:
         if item.book.category:
             cat_counter[item.book.category.name] += item.quantity
     for r in ratings:
         if r.book.category and r.score >= 4:
-            cat_counter[r.book.category.name] += r.score - 2
-            
-    dna["chart_categories"] = {
-        "labels": [name for name, _ in cat_counter.most_common(5)],
-        "values": [count for _, count in cat_counter.most_common(5)]
-    }
-    
-    total_cat = sum(cat_counter.values())
-    dna["categories"] = [
-        {"name": name, "count": count, "pct": round(count / total_cat * 100) if total_cat else 0}
-        for name, count in cat_counter.most_common(6)
-    ]
+            cat_counter[r.book.category.name] += r.score - 2  # weight by score
 
-    # 2. Monthly Trend (For Line Chart)
-    # Get last 6 months of purchases
-    six_months_ago = timezone.now() - timedelta(days=180)
-    monthly_data = (
-        OrderItem.objects.filter(order__user=user, order__created_at__gte=six_months_ago)
-        .annotate(month=F("order__created_at__month"))
-        .values("month")
-        .annotate(total=Sum("quantity"))
-        .order_by("month")
-    )
-    
-    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    dna["chart_trend"] = {
-        "labels": [month_names[d["month"]-1] for d in monthly_data],
-        "values": [d["total"] for d in monthly_data]
-    }
+    if cat_counter:
+        total_cat = sum(cat_counter.values())
+        dna["categories"] = [
+            {"name": name, "count": count, "pct": round(count / total_cat * 100)}
+            for name, count in cat_counter.most_common(6)
+        ]
+    else:
+        dna["categories"] = []
 
-    # 3. Favorite authors
+    # Favorite authors
     author_counter = Counter()
     for item in orders:
         author_counter[item.book.author] += item.quantity
@@ -1019,32 +989,46 @@ def _get_user_reading_dna(user):
         for name, count in author_counter.most_common(5)
     ]
 
-    # 4. Stats & Price range
+    # Price range preference
     prices = [float(item.book.price) for item in orders]
-    dna["price_range"] = {
-        "min": min(prices) if prices else 0,
-        "max": max(prices) if prices else 0,
-        "avg": round(sum(prices) / len(prices)) if prices else 0,
-    }
+    if prices:
+        dna["price_range"] = {
+            "min": min(prices),
+            "max": max(prices),
+            "avg": round(sum(prices) / len(prices)),
+        }
+    else:
+        dna["price_range"] = None
+
+    # Average rating given
+    avg_score = ratings.aggregate(avg=Avg("score"))["avg"]
+    dna["avg_rating_given"] = round(avg_score, 1) if avg_score else None
+
+    # Total books, total spent
     dna["total_books_bought"] = sum(item.quantity for item in orders)
     dna["total_spent"] = sum(float(item.price) * item.quantity for item in orders)
     dna["total_ratings"] = ratings.count()
 
-    # 5. Reading Mood & AI Persona
-    top_cat = dna["categories"][0]["name"].lower() if dna["categories"] else ""
-    mood_map = {
-        "fiction": "Dreamer", "mystery": "Detective", "romance": "Romantic",
-        "science": "Explorer", "programming": "Builder", "history": "Historian",
-        "fantasy": "Adventurer", "thriller": "Thrill-Seeker",
-    }
-    dna["reading_mood"] = "Bookworm"
-    for key, mood in mood_map.items():
-        if key in top_cat:
-            dna["reading_mood"] = mood
-            break
-            
-    # AI generated persona summary (Simplified for speed)
-    dna["ai_insight"] = f"Bạn là một {dna['reading_mood']} chính hiệu với niềm đam mê lớn dành cho {top_cat.upper()}. Phong cách đọc của bạn cho thấy sự tò mò vô tận!"
+    # Reading mood (based on category distribution)
+    if dna["categories"]:
+        top_cat = dna["categories"][0]["name"].lower()
+        mood_map = {
+            "fiction": "Dreamer",
+            "mystery": "Detective",
+            "romance": "Romantic",
+            "science": "Explorer",
+            "programming": "Builder",
+            "history": "Historian",
+            "fantasy": "Adventurer",
+            "thriller": "Thrill-Seeker",
+        }
+        dna["reading_mood"] = "Bookworm"
+        for key, mood in mood_map.items():
+            if key in top_cat:
+                dna["reading_mood"] = mood
+                break
+    else:
+        dna["reading_mood"] = "Newcomer"
 
     dna["milestones"] = _get_user_milestones(user, dna)
     return dna
@@ -1192,7 +1176,7 @@ def _get_explainable_recommendations(user, limit=8):
 
 
 @staff_member_required
-def dashboard(request: HttpRequest) -> HttpResponse:
+def dashboard(request):
     now = timezone.now()
 
     # Overall stats
@@ -1271,11 +1255,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     return render(request, "books/dashboard.html", context)
 
 
-# ═══════════════════════════════════════════════════════════════════
-# Admin Helpers
-# ═══════════════════════════════════════════════════════════════════
-
-
 def _require_perm(request: HttpRequest, perm: str, redirect_name: str) -> bool:
     if request.user.has_perm(perm):
         return True
@@ -1299,11 +1278,6 @@ def _log_admin_action(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════
-# Admin Users
-# ═══════════════════════════════════════════════════════════════════
-
-
 @staff_member_required
 def dashboard_users(request: HttpRequest) -> HttpResponse:
     if not _require_perm(request, "auth.view_user", "dashboard"):
@@ -1317,12 +1291,11 @@ def dashboard_users(request: HttpRequest) -> HttpResponse:
             | Q(first_name__icontains=query)
             | Q(last_name__icontains=query)
         )
-    users_qs = users_qs.order_by("-date_joined")
-    context = {
-        "users": users_qs[:200],
-        "query": query,
-    }
-    return render(request, "books/dashboard_users.html", context)
+    return render(
+        request,
+        "books/dashboard_users.html",
+        {"users": users_qs.order_by("-date_joined")[:200], "query": query},
+    )
 
 
 @staff_member_required
@@ -1331,23 +1304,13 @@ def dashboard_user_toggle_staff(request: HttpRequest, pk: int) -> HttpResponse:
     if not _require_perm(request, "auth.change_user", "dashboard_users"):
         return redirect("dashboard_users")
     target = get_object_or_404(User, pk=pk)
-    if target.pk == request.user.pk:
-        messages.error(request, "Khong the tu thay doi quyen cua chinh minh.")
-        return redirect("dashboard_users")
-    if target.is_superuser:
-        messages.error(request, "Khong the thay doi quyen cua superuser khac.")
+    if target.pk == request.user.pk or target.is_superuser:
+        messages.error(request, "Khong the thay doi quyen tai khoan nay.")
         return redirect("dashboard_users")
     target.is_staff = not target.is_staff
     target.save(update_fields=["is_staff"])
-    status_text = "da cap quyen" if target.is_staff else "da go quyen"
-    _log_admin_action(
-        request,
-        action="toggle_staff",
-        target_type="user",
-        target_id=target.pk,
-        metadata={"is_staff": target.is_staff},
-    )
-    messages.success(request, f"{status_text} staff cho {target.username}.")
+    _log_admin_action(request, "toggle_staff", "user", target.pk, {"is_staff": target.is_staff})
+    messages.success(request, f"Da cap nhat quyen staff cho {target.username}.")
     return redirect("dashboard_users")
 
 
@@ -1357,29 +1320,14 @@ def dashboard_user_toggle_active(request: HttpRequest, pk: int) -> HttpResponse:
     if not _require_perm(request, "auth.change_user", "dashboard_users"):
         return redirect("dashboard_users")
     target = get_object_or_404(User, pk=pk)
-    if target.pk == request.user.pk:
-        messages.error(request, "Khong the tu khoa tai khoan cua chinh minh.")
-        return redirect("dashboard_users")
-    if target.is_superuser:
-        messages.error(request, "Khong the khoa superuser khac.")
+    if target.pk == request.user.pk or target.is_superuser:
+        messages.error(request, "Khong the khoa/mo tai khoan nay.")
         return redirect("dashboard_users")
     target.is_active = not target.is_active
     target.save(update_fields=["is_active"])
-    status_text = "da kich hoat" if target.is_active else "da khoa"
-    _log_admin_action(
-        request,
-        action="toggle_active",
-        target_type="user",
-        target_id=target.pk,
-        metadata={"is_active": target.is_active},
-    )
-    messages.success(request, f"{status_text} tai khoan {target.username}.")
+    _log_admin_action(request, "toggle_active", "user", target.pk, {"is_active": target.is_active})
+    messages.success(request, f"Da cap nhat trang thai tai khoan {target.username}.")
     return redirect("dashboard_users")
-
-
-# ═══════════════════════════════════════════════════════════════════
-# Admin Books
-# ═══════════════════════════════════════════════════════════════════
 
 
 @staff_member_required
@@ -1393,39 +1341,30 @@ def dashboard_books(request: HttpRequest) -> HttpResponse:
         qs = qs.filter(Q(title__icontains=query) | Q(author__icontains=query))
     if category_id:
         qs = qs.filter(category_id=category_id)
-    qs = qs.order_by("-created_at")
-    paginator = Paginator(qs, 20)
-    page = paginator.get_page(request.GET.get("page", 1))
-    context = {
-        "books": page.object_list,
-        "page": page,
-        "categories": Category.objects.order_by("name"),
-        "query": query,
-        "category_id": category_id,
-    }
-    return render(request, "books/dashboard_books.html", context)
+    page = Paginator(qs.order_by("-created_at"), 20).get_page(request.GET.get("page", 1))
+    return render(
+        request,
+        "books/dashboard_books.html",
+        {
+            "books": page.object_list,
+            "page": page,
+            "categories": Category.objects.order_by("name"),
+            "query": query,
+            "category_id": category_id,
+        },
+    )
 
 
 @staff_member_required
 def dashboard_book_create(request: HttpRequest) -> HttpResponse:
     if not _require_perm(request, "books.add_book", "dashboard_books"):
         return redirect("dashboard_books")
-    if request.method == "POST":
-        form = BookAdminForm(request.POST)
-        if form.is_valid():
-            data = form.cleaned_data
-            book = Book.objects.create(**data)
-            _log_admin_action(
-                request,
-                action="book_create",
-                target_type="book",
-                target_id=book.pk,
-                metadata={"title": book.title},
-            )
-            messages.success(request, "Da tao sach moi.")
-            return redirect("dashboard_books")
-    else:
-        form = BookAdminForm()
+    form = BookAdminForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        book = form.save()
+        _log_admin_action(request, "book_create", "book", book.pk, {"title": book.title})
+        messages.success(request, "Da tao sach moi.")
+        return redirect("dashboard_books")
     return render(request, "books/dashboard_book_form.html", {"form": form, "mode": "create"})
 
 
@@ -1434,27 +1373,13 @@ def dashboard_book_edit(request: HttpRequest, pk: int) -> HttpResponse:
     if not _require_perm(request, "books.change_book", "dashboard_books"):
         return redirect("dashboard_books")
     book = get_object_or_404(Book, pk=pk)
-    if request.method == "POST":
-        form = BookAdminForm(request.POST, instance=book)
-        if form.is_valid():
-            data = form.cleaned_data
-            Book.objects.filter(pk=book.pk).update(**data)
-            _log_admin_action(
-                request,
-                action="book_edit",
-                target_type="book",
-                target_id=book.pk,
-                metadata={"title": data.get("title")},
-            )
-            messages.success(request, "Da cap nhat sach.")
-            return redirect("dashboard_books")
-    else:
-        form = BookAdminForm(instance=book)
-    return render(
-        request,
-        "books/dashboard_book_form.html",
-        {"form": form, "mode": "edit", "book": book},
-    )
+    form = BookAdminForm(request.POST or None, instance=book)
+    if request.method == "POST" and form.is_valid():
+        book = form.save()
+        _log_admin_action(request, "book_edit", "book", book.pk, {"title": book.title})
+        messages.success(request, "Da cap nhat sach.")
+        return redirect("dashboard_books")
+    return render(request, "books/dashboard_book_form.html", {"form": form, "mode": "edit", "book": book})
 
 
 @staff_member_required
@@ -1464,20 +1389,9 @@ def dashboard_book_delete(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("dashboard_books")
     book = Book.objects.filter(pk=pk).first()
     Book.objects.filter(pk=pk).delete()
-    _log_admin_action(
-        request,
-        action="book_delete",
-        target_type="book",
-        target_id=pk,
-        metadata={"title": book.title if book else ""},
-    )
+    _log_admin_action(request, "book_delete", "book", pk, {"title": book.title if book else ""})
     messages.success(request, "Da xoa sach.")
     return redirect("dashboard_books")
-
-
-# ═══════════════════════════════════════════════════════════════════
-# Admin Coupons
-# ═══════════════════════════════════════════════════════════════════
 
 
 @staff_member_required
@@ -1488,37 +1402,20 @@ def dashboard_coupons(request: HttpRequest) -> HttpResponse:
     qs = Coupon.objects.all()
     if query:
         qs = qs.filter(code__icontains=query)
-    qs = qs.order_by("-created_at")
-    paginator = Paginator(qs, 20)
-    page = paginator.get_page(request.GET.get("page", 1))
-    context = {
-        "coupons": page.object_list,
-        "page": page,
-        "query": query,
-    }
-    return render(request, "books/dashboard_coupons.html", context)
+    page = Paginator(qs.order_by("-created_at"), 20).get_page(request.GET.get("page", 1))
+    return render(request, "books/dashboard_coupons.html", {"coupons": page.object_list, "page": page, "query": query})
 
 
 @staff_member_required
 def dashboard_coupon_create(request: HttpRequest) -> HttpResponse:
     if not _require_perm(request, "books.add_coupon", "dashboard_coupons"):
         return redirect("dashboard_coupons")
-    if request.method == "POST":
-        form = CouponAdminForm(request.POST)
-        if form.is_valid():
-            data = form.cleaned_data
-            coupon = Coupon.objects.create(**data)
-            _log_admin_action(
-                request,
-                action="coupon_create",
-                target_type="coupon",
-                target_id=coupon.pk,
-                metadata={"code": coupon.code},
-            )
-            messages.success(request, "Da tao ma giam gia.")
-            return redirect("dashboard_coupons")
-    else:
-        form = CouponAdminForm()
+    form = CouponAdminForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        coupon = form.save()
+        _log_admin_action(request, "coupon_create", "coupon", coupon.pk, {"code": coupon.code})
+        messages.success(request, "Da tao ma giam gia.")
+        return redirect("dashboard_coupons")
     return render(request, "books/dashboard_coupon_form.html", {"form": form, "mode": "create"})
 
 
@@ -1527,27 +1424,13 @@ def dashboard_coupon_edit(request: HttpRequest, pk: int) -> HttpResponse:
     if not _require_perm(request, "books.change_coupon", "dashboard_coupons"):
         return redirect("dashboard_coupons")
     coupon = get_object_or_404(Coupon, pk=pk)
-    if request.method == "POST":
-        form = CouponAdminForm(request.POST, instance=coupon)
-        if form.is_valid():
-            data = form.cleaned_data
-            Coupon.objects.filter(pk=coupon.pk).update(**data)
-            _log_admin_action(
-                request,
-                action="coupon_edit",
-                target_type="coupon",
-                target_id=coupon.pk,
-                metadata={"code": data.get("code")},
-            )
-            messages.success(request, "Da cap nhat ma giam gia.")
-            return redirect("dashboard_coupons")
-    else:
-        form = CouponAdminForm(instance=coupon)
-    return render(
-        request,
-        "books/dashboard_coupon_form.html",
-        {"form": form, "mode": "edit", "coupon": coupon},
-    )
+    form = CouponAdminForm(request.POST or None, instance=coupon)
+    if request.method == "POST" and form.is_valid():
+        coupon = form.save()
+        _log_admin_action(request, "coupon_edit", "coupon", coupon.pk, {"code": coupon.code})
+        messages.success(request, "Da cap nhat ma giam gia.")
+        return redirect("dashboard_coupons")
+    return render(request, "books/dashboard_coupon_form.html", {"form": form, "mode": "edit", "coupon": coupon})
 
 
 @staff_member_required
@@ -1557,20 +1440,9 @@ def dashboard_coupon_delete(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("dashboard_coupons")
     coupon = Coupon.objects.filter(pk=pk).first()
     Coupon.objects.filter(pk=pk).delete()
-    _log_admin_action(
-        request,
-        action="coupon_delete",
-        target_type="coupon",
-        target_id=pk,
-        metadata={"code": coupon.code if coupon else ""},
-    )
+    _log_admin_action(request, "coupon_delete", "coupon", pk, {"code": coupon.code if coupon else ""})
     messages.success(request, "Da xoa ma giam gia.")
     return redirect("dashboard_coupons")
-
-
-# ═══════════════════════════════════════════════════════════════════
-# Admin Orders
-# ═══════════════════════════════════════════════════════════════════
 
 
 @staff_member_required
@@ -1584,17 +1456,12 @@ def dashboard_orders(request: HttpRequest) -> HttpResponse:
         qs = qs.filter(Q(pk__icontains=query) | Q(user__username__icontains=query))
     if status:
         qs = qs.filter(status=status)
-    qs = qs.order_by("-created_at")
-    paginator = Paginator(qs, 20)
-    page = paginator.get_page(request.GET.get("page", 1))
-    context = {
-        "orders": page.object_list,
-        "page": page,
-        "query": query,
-        "status": status,
-        "order_statuses": Order.STATUS_CHOICES,
-    }
-    return render(request, "books/dashboard_orders.html", context)
+    page = Paginator(qs.order_by("-created_at"), 20).get_page(request.GET.get("page", 1))
+    return render(
+        request,
+        "books/dashboard_orders.html",
+        {"orders": page.object_list, "page": page, "query": query, "status": status, "order_statuses": Order.STATUS_CHOICES},
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1624,10 +1491,10 @@ def export_orders_csv(request):
         ])
     _log_admin_action(
         request,
-        action="export_orders_csv",
-        target_type="order",
-        target_id="all",
-        metadata={"count": Order.objects.count()},
+        "export_orders_csv",
+        "order",
+        "all",
+        {"count": Order.objects.count()},
     )
     return response
 
@@ -1654,10 +1521,10 @@ def export_books_csv(request):
         ])
     _log_admin_action(
         request,
-        action="export_books_csv",
-        target_type="book",
-        target_id="all",
-        metadata={"count": Book.objects.count()},
+        "export_books_csv",
+        "book",
+        "all",
+        {"count": Book.objects.count()},
     )
     return response
 
@@ -1674,18 +1541,13 @@ def api_update_order_status(request, pk: int):
         order.save(update_fields=["status"])
         _log_admin_action(
             request,
-            action="order_status_update",
-            target_type="order",
-            target_id=order.pk,
-            metadata={"status": order.status},
+            "order_status_update",
+            "order",
+            order.pk,
+            {"status": order.status},
         )
         return JsonResponse({"status": "ok", "message": f"Đã cập nhật đơn hàng #{order.pk} sang {order.status_display_vi}."})
     return JsonResponse({"status": "error", "message": "Trạng thái không hợp lệ."}, status=400)
-
-
-# ═══════════════════════════════════════════════════════════════════
-# Admin Audit Logs
-# ═══════════════════════════════════════════════════════════════════
 
 
 @staff_member_required
@@ -1693,13 +1555,8 @@ def dashboard_audit_logs(request: HttpRequest) -> HttpResponse:
     if not _require_perm(request, "books.view_adminauditlog", "dashboard"):
         return redirect("dashboard")
     qs = AdminAuditLog.objects.select_related("actor")
-    paginator = Paginator(qs, 30)
-    page = paginator.get_page(request.GET.get("page", 1))
-    return render(
-        request,
-        "books/dashboard_audit.html",
-        {"logs": page.object_list, "page": page},
-    )
+    page = Paginator(qs, 30).get_page(request.GET.get("page", 1))
+    return render(request, "books/dashboard_audit.html", {"logs": page.object_list, "page": page})
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1908,6 +1765,27 @@ def _stream_chat_payload(payload_or_generator, is_real_stream=False, chunk_size:
             yield json.dumps({"type": "delta", "content": chunk}, ensure_ascii=False).encode("utf-8") + b"\n"
         yield json.dumps({"type": "final", "payload": payload}, ensure_ascii=False).encode("utf-8") + b"\n"
 
+
+def _stream_chat_payload_with_history(request, stream_gen, user_message, found_books) -> Iterable[bytes]:
+    yield json.dumps({"type": "start"}, ensure_ascii=False).encode("utf-8") + b"\n"
+    full_text = ""
+    for chunk in stream_gen:
+        full_text += chunk
+        yield json.dumps({"type": "delta", "content": chunk}, ensure_ascii=False).encode("utf-8") + b"\n"
+
+    payload = {"text": full_text, "type": "text"}
+    if found_books:
+        payload["type"] = "books"
+        payload["books"] = found_books
+    yield json.dumps({"type": "final", "payload": payload}, ensure_ascii=False).encode("utf-8") + b"\n"
+
+    history = _get_chat_history(request)
+    updated = _append_chat_history(request, history, "user", user_message, settings.OLLAMA_CONTEXT_TURNS)
+    _append_chat_history(request, updated, "assistant", full_text, settings.OLLAMA_CONTEXT_TURNS)
+    if found_books:
+        _set_last_books(request, found_books)
+    request.session.save()
+
 @csrf_exempt
 def api_chatbot(request) -> JsonResponse:
     """API for Bookie Chatbot."""
@@ -1948,8 +1826,8 @@ def api_chatbot(request) -> JsonResponse:
 
 
 @csrf_exempt
-def api_chatbot(request) -> JsonResponse:
-    """API for Bookie Chatbot (Synchronous fallback)."""
+def api_chatbot_sync_unused(request) -> JsonResponse:
+    """Legacy synchronous fallback kept out of URL routing."""
     if request.method != "POST":
         return JsonResponse({"error": "Only POST allowed"}, status=405)
     
@@ -1989,35 +1867,9 @@ def api_chatbot(request) -> JsonResponse:
         return JsonResponse({"error": str(e)}, status=400)
 
 
-def _stream_chat_payload(request, stream_gen, user_message, found_books) -> Iterable[bytes]:
-    """Generator that yields NDJSON chunks and updates session history at the end."""
-    yield json.dumps({"type": "start"}, ensure_ascii=False).encode("utf-8") + b"\n"
-    
-    full_text = ""
-    for chunk in stream_gen:
-        full_text += chunk
-        yield json.dumps({"type": "delta", "content": chunk}, ensure_ascii=False).encode("utf-8") + b"\n"
-    
-    payload = {"text": full_text, "type": "text"}
-    if found_books:
-        payload["type"] = "books"
-        payload["books"] = found_books
-
-    yield json.dumps({"type": "final", "payload": payload}, ensure_ascii=False).encode("utf-8") + b"\n"
-
-    try:
-        history = _get_chat_history(request)
-        _append_chat_history(request, history, "assistant", full_text, settings.OLLAMA_CONTEXT_TURNS)
-        if found_books:
-            _set_last_books(request, found_books)
-        request.session.save()
-    except Exception:
-        pass
-
-
 @csrf_exempt
 def api_chatbot_stream(request) -> HttpResponse:
-    """Streaming API for Bookie Chatbot (NDJSON)."""
+    """True Streaming API for Bookie Chatbot (NDJSON)."""
     if request.method != "POST":
         return JsonResponse({"error": "Only POST allowed"}, status=405)
 
@@ -2029,96 +1881,73 @@ def api_chatbot_stream(request) -> HttpResponse:
 
         history = _get_chat_history(request)
         bot = _build_chatbot(request)
-        
-        # 1. Lưu user message ngay
-        history = _append_chat_history(request, history, "user", user_message, settings.OLLAMA_CONTEXT_TURNS)
-        request.session.save()
-
-        # 2. Lấy context sách
         found_books = bot.prepare_stream_context(user_message)
-        
-        # 3. Build prompt (Dùng hàm mới!)
         prompt = bot.build_prompt(user_message, history, found_books)
-        
-        # 4. Stream
         stream_gen = bot._client.stream_generate(prompt)
-        
+
         return StreamingHttpResponse(
-            _stream_chat_payload(request, stream_gen, user_message, found_books), 
-            content_type="application/x-ndjson"
+            _stream_chat_payload_with_history(request, stream_gen, user_message, found_books),
+            content_type="application/x-ndjson",
         )
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=400)
 
 
 @login_required
 def read_book(request, pk: int):
-    """View to open the cinematic e-reader."""
     book = get_object_or_404(Book, pk=pk)
-    
     if not book.is_digital:
         messages.warning(request, "Cuốn sách này hiện chưa hỗ trợ đọc trực tuyến.")
-        return redirect('book_detail', pk=pk)
-        
-    # Check ownership if the book is not free
+        return redirect("book_detail", pk=pk)
+
     is_preview = False
     if book.price > 0:
         has_purchased = OrderItem.objects.filter(
             order__user=request.user,
             book=book,
-            is_digital_purchase=True
+            is_digital_purchase=True,
         ).exists()
-        
         if not has_purchased:
             is_preview = True
-            messages.info(request, "Bạn đang xem bản đọc thử (Look Inside).")
+            messages.info(request, "Bạn đang xem bản đọc thử.")
 
-    # Get or create progress
-    progress, created = ReadingProgress.objects.get_or_create(user=request.user, book=book)
-    
-    # Split content into pages (simple splitting by newline or length for now)
-    pages = book.content_text.split('\n\n')
-    
-    # If preview, limit pages to 10% or 5 pages max
+    progress, _ = ReadingProgress.objects.get_or_create(user=request.user, book=book)
+    pages = [page.strip() for page in (book.content_text or "").split("\n\n") if page.strip()]
+    if not pages:
+        pages = ["Nội dung sách đang được cập nhật."]
     if is_preview:
-        preview_limit = max(5, int(len(pages) * 0.10))
+        preview_limit = max(1, min(5, math.ceil(len(pages) * 0.10)))
         pages = pages[:preview_limit]
-        
-    total_pages = len(pages)
-    
-    # Ensure last_page is within bounds
-    current_page = min(max(1, progress.last_page), total_pages) if total_pages > 0 else 1
 
-    context = {
-        "book": book,
-        "pages": pages,
-        "total_pages": total_pages,
-        "current_page": current_page,
-        "progress": progress,
-        "is_preview": is_preview,
-    }
-    return render(request, "books/reader.html", context)
+    total_pages = len(pages)
+    current_page = min(max(1, progress.last_page), total_pages)
+    return render(
+        request,
+        "books/reader.html",
+        {
+            "book": book,
+            "pages": json.dumps(pages, ensure_ascii=False),
+            "total_pages": total_pages,
+            "current_page": current_page,
+            "progress": progress,
+            "is_preview": is_preview,
+        },
+    )
 
 
 @login_required
-@csrf_exempt
+@require_POST
 def api_save_reading_progress(request, pk: int):
-    """AJAX endpoint to save reading progress."""
-    if request.method == "POST":
-        book = get_object_or_404(Book, pk=pk)
-        try:
-            data = json.loads(request.body)
-            page = int(data.get("page", 1))
-            finished = data.get("finished", False)
-            
-            progress, _ = ReadingProgress.objects.get_or_create(user=request.user, book=book)
-            progress.last_page = page
-            progress.is_finished = finished
-            progress.save()
-            
-            return JsonResponse({"status": "success"})
-        except Exception as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
-    return JsonResponse({"status": "error", "message": "Only POST allowed"}, status=405)
+    book = get_object_or_404(Book, pk=pk)
+    try:
+        data = json.loads(request.body or "{}")
+        page = max(1, int(data.get("page", 1)))
+        finished = bool(data.get("finished", False))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        return JsonResponse({"status": "error", "message": str(exc)}, status=400)
+
+    progress, _ = ReadingProgress.objects.get_or_create(user=request.user, book=book)
+    progress.last_page = page
+    progress.is_finished = finished
+    progress.save(update_fields=["last_page", "is_finished", "last_read_at"])
+    return JsonResponse({"status": "success"})

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -78,33 +79,27 @@ WSGI_APPLICATION = 'bookstore.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-# Database configuration
-# Using PostgreSQL if DB_HOST is defined AND library is available, otherwise fallback to SQLite
-USE_SQLITE_FOR_TESTS = os.getenv('USE_SQLITE_FOR_TESTS') == '1'
-DB_HOST = os.getenv('DB_HOST')
+USE_SQLITE_FOR_TESTS = os.getenv('USE_SQLITE_FOR_TESTS') == '1' or 'test' in sys.argv
 
-try:
-    if USE_SQLITE_FOR_TESTS:
-        raise ImportError
-    if DB_HOST:
-        import psycopg2
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': os.getenv('DB_NAME', 'bookstore_db'),
-                'USER': os.getenv('DB_USER', 'postgres'),
-                'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
-                'HOST': DB_HOST,
-                'PORT': os.getenv('DB_PORT', '5432'),
-            }
-        }
-    else:
-        raise ImportError
-except ImportError:
+if USE_SQLITE_FOR_TESTS or not os.getenv('DB_HOST'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('DB_NAME'),
+            'USER': os.getenv('DB_USER'),
+            'PASSWORD': os.getenv('DB_PASSWORD'),
+            'HOST': os.getenv('DB_HOST'),
+            'PORT': os.getenv('DB_PORT'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+            },
         }
     }
 

@@ -50,7 +50,7 @@ class BookieChatbot:
                         "title": b.title,
                         "price": f"{b.price:,.0f}₫",
                         "url": f"/books/{b.pk}/",
-                        "image": b.cover_image if b.cover_image else None,
+                        "image": b.cover_image or None,
                     }
                     for b in books_qs
                 ]
@@ -117,18 +117,18 @@ class BookieChatbot:
         history_block = "\n".join(history_lines)
 
         system_rules = [
-            "Bạn là Bookie, trợ lý ảo CHỈ ĐƯỢC PHÉP tư vấn sách dựa trên dữ liệu thực tế của nhà sách.",
-            "QUY TẮC CỰC KỲ NGHIÊM NGẶT:",
-            "1. KHÔNG ĐƯỢC TỰ BỊA TÊN SÁCH. Nếu không có sách trong dữ liệu, hãy nói: 'Tiếc quá, hiện tại Bookie chưa có sách đúng chủ đề này. Bạn thử tìm chủ đề khác nhé!'",
-            "2. CHỈ TRẢ LỜI những gì liên quan đến sách và hỗ trợ khách hàng. Không tán gẫu ngoài lề.",
-            "3. Nếu có sách được cung cấp bên dưới, hãy liệt kê chúng một cách chuyên nghiệp.",
+            "Bạn là Bookie, trợ lý ảo thông minh và thân thiện của nhà sách Bookie (Smart Bookstore).",
+            "Nhiệm vụ: Tư vấn sách, tra cứu đơn hàng và trò chuyện cùng độc giả bằng tiếng Việt.",
+            "QUY TẮC:",
+            "1. KHÔNG tự bịa tên sách không có trong dữ liệu.",
+            "2. Trả lời ngắn gọn, súc tích, đậm chất điện ảnh.",
         ]
 
         if found_books:
             titles = ", ".join([f"'{b['title']}'" for b in found_books])
-            system_rules.append(f"DỮ LIỆU SÁCH CÓ THẬT: {titles}. Hãy giới thiệu chính xác các cuốn này.")
+            system_rules.append(f"3. Dữ liệu thực tế đang có các sách: {titles}. Hãy ưu tiên giới thiệu chúng.")
         else:
-            system_rules.append("DỮ LIỆU SÁCH CÓ THẬT: TRỐNG. (Cảnh báo: Không có sách phù hợp, hãy thông báo cho khách).")
+            system_rules.append("3. Nếu khách hỏi về sách cụ thể mà bạn không chắc chắn, hãy mời họ tìm kiếm theo chủ đề.")
 
         system_prompt = "\n".join(system_rules)
 
@@ -144,10 +144,9 @@ class BookieChatbot:
         """Helper to find books before starting a stream response."""
         search_query = _normalize_query(text)
         if search_query and len(search_query) > 2:
-            # Ưu tiên tìm theo Category trước vì mapping đã xử lý dịch thuật
             books_qs = Book.objects.filter(
-                Q(category__name__icontains=search_query) |
                 Q(title__icontains=search_query) | 
+                Q(category__name__icontains=search_query) |
                 Q(author__icontains=search_query)
             )[:3]
             return [
@@ -156,7 +155,7 @@ class BookieChatbot:
                     "title": b.title,
                     "price": f"{b.price:,.0f}₫",
                     "url": f"/books/{b.pk}/",
-                    "image": b.cover_image if b.cover_image else None,
+                    "image": b.cover_image or None,
                 }
                 for b in books_qs
             ]
@@ -414,31 +413,6 @@ def _coerce_int(value: Any, default: int, min_value: int, max_value: int) -> int
 
 def _normalize_query(query: str) -> str:
     cleaned = query.lower().strip()
-    # Loại bỏ các từ dừng (stop words)
-    cleaned = re.sub(r"\b(tim|sach|co|khong|ve|cua|tac gia|muon|quyen|cuon|gia|re|cho|toi|loai|the|the loai)\b", "", cleaned)
+    cleaned = re.sub(r"\b(tim|sach|co|khong|ve|cua|tac gia|muon|quyen|cuon|gia|re)\b", "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    
-    # Ánh xạ từ khóa tiếng Việt sang tên Category trong DB (Thường là tiếng Anh)
-    mapping = {
-        "khoa học": "science",
-        "văn học": "fiction",
-        "viễn tưởng": "science fiction",
-        "bí ẩn": "mystery",
-        "trinh thám": "mystery",
-        "lập trình": "programming",
-        "công nghệ": "technology",
-        "kinh dị": "horror",
-        "lãng mạn": "romance",
-        "tình cảm": "romance",
-        "lịch sử": "history",
-        "kinh doanh": "business",
-        "kỹ năng": "self-help",
-        "thiếu nhi": "children",
-    }
-    
-    # Nếu từ khóa khớp với mapping, trả về giá trị mapped
-    for vn, en in mapping.items():
-        if vn in cleaned:
-            return en
-            
     return cleaned
