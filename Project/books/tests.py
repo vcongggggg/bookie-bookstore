@@ -1,11 +1,13 @@
 import json
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.cache import cache
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 from django.urls import reverse
-from books.models import Book, Category, Order, OrderItem, ReadingProgress
+from django.utils import timezone
+from books.models import Book, Category, Coupon, Order, OrderItem, ReadingProgress
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -131,6 +133,78 @@ class BasicFlowTest(TestCase):
         self.assertTrue(item.is_digital_purchase)
         self.book.refresh_from_db()
         self.assertEqual(self.book.stock, 10)
+
+    def test_physical_checkout_decreases_stock_and_uses_requested_quantity(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("add_to_cart", args=[self.book.id]),
+            data={"quantity": "3"},
+        )
+        self.assertEqual(response.status_code, 302)
+
+        response = self.client.post(
+            reverse("checkout"),
+            data={
+                "shipping_address": "123 Test Street",
+                "note": "",
+                "coupon_code": "",
+                "payment_method": "cod",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        item = OrderItem.objects.get(book=self.book)
+        self.assertEqual(item.quantity, 3)
+        self.assertFalse(item.is_digital_purchase)
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.stock, 7)
+
+    def test_valid_coupon_reduces_order_total_and_increments_usage(self):
+        coupon = Coupon.objects.create(
+            code="SAVE10",
+            discount_type="percent",
+            discount_value=10,
+            min_order_amount=0,
+            max_uses=5,
+            valid_to=timezone.now() + timedelta(days=7),
+        )
+        self.client.force_login(self.user)
+        self.client.post(reverse("add_to_cart", args=[self.book.id]), data={"quantity": "2"})
+
+        response = self.client.post(
+            reverse("checkout"),
+            data={
+                "shipping_address": "123 Test Street",
+                "note": "",
+                "coupon_code": "SAVE10",
+                "payment_method": "cod",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(order.coupon, coupon)
+        self.assertEqual(float(order.discount_amount), 20.0)
+        self.assertEqual(float(order.total), 180.0)
+        coupon.refresh_from_db()
+        self.assertEqual(coupon.used_count, 1)
+
+    def test_invalid_coupon_does_not_block_checkout_or_discount_order(self):
+        self.client.force_login(self.user)
+        self.client.post(reverse("add_to_cart", args=[self.book.id]), data={"quantity": "1"})
+
+        response = self.client.post(
+            reverse("checkout"),
+            data={
+                "shipping_address": "123 Test Street",
+                "note": "",
+                "coupon_code": "NOPE",
+                "payment_method": "cod",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        order = Order.objects.get(user=self.user)
+        self.assertIsNone(order.coupon)
+        self.assertEqual(float(order.discount_amount), 0.0)
+        self.assertEqual(float(order.total), 100.0)
 
     def test_dashboard_urls_reverse(self):
         names = [
