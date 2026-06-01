@@ -2,6 +2,7 @@ import csv
 import json
 import math
 import re
+from io import BytesIO
 from collections import Counter, defaultdict
 from datetime import timedelta
 from typing import Any, Iterable
@@ -19,6 +20,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .chatbot import BookieChatbot
 from .forms import (
@@ -736,6 +741,61 @@ def order_list(request):
 def order_detail(request, pk: int):
     order = get_object_or_404(Order, pk=pk, user=request.user)
     return render(request, "books/order_detail.html", {"order": order})
+
+
+@login_required
+def order_invoice_pdf(request, pk: int):
+    order = get_object_or_404(
+        Order.objects.select_related("user", "coupon").prefetch_related("items__book"),
+        pk=pk,
+        user=request.user,
+    )
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, title=f"Invoice #{order.pk}")
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph("BOOKIE INVOICE", styles["Title"]),
+        Paragraph(f"Invoice for order #{order.pk}", styles["Heading2"]),
+        Spacer(1, 12),
+        Paragraph(f"Customer: {order.user.username}", styles["Normal"]),
+        Paragraph(f"Order date: {order.created_at.strftime('%Y-%m-%d %H:%M')}", styles["Normal"]),
+        Paragraph(f"Status: {order.status_display_vi}", styles["Normal"]),
+        Paragraph(f"Shipping address: {order.shipping_address or 'N/A'}", styles["Normal"]),
+        Spacer(1, 16),
+    ]
+
+    rows = [["Book", "Qty", "Unit price", "Subtotal"]]
+    for item in order.items.all():
+        rows.append([
+            item.book.title,
+            str(item.quantity),
+            f"{item.price:,.0f} VND",
+            f"{item.subtotal:,.0f} VND",
+        ])
+    rows.extend([
+        ["", "", "Subtotal", f"{order.subtotal:,.0f} VND"],
+        ["", "", "Discount", f"-{order.discount_amount:,.0f} VND"],
+        ["", "", "Total", f"{order.total:,.0f} VND"],
+    ])
+
+    table = Table(rows, colWidths=[230, 50, 100, 100])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1d5db")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f3f4f6")),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 16))
+    story.append(Paragraph("Thank you for shopping at Bookie.", styles["Normal"]))
+    doc.build(story)
+
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="bookie-order-{order.pk}.pdf"'
+    return response
 
 
 # ═══════════════════════════════════════════════════════════════════

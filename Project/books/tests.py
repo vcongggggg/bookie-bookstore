@@ -150,6 +150,31 @@ class BasicFlowTest(TestCase):
             with self.subTest(name=name):
                 self.assertTrue(reverse(name, args=args).startswith("/"))
 
+    def test_order_detail_links_invoice_pdf(self):
+        order = Order.objects.create(user=self.user, shipping_address="123 Test Street")
+        OrderItem.objects.create(order=order, book=self.book, quantity=2, price=self.book.price)
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("order_detail", args=[order.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("order_invoice_pdf", args=[order.pk]))
+
+    def test_order_invoice_pdf_download_requires_owner(self):
+        order = Order.objects.create(user=self.user, shipping_address="123 Test Street")
+        OrderItem.objects.create(order=order, book=self.book, quantity=2, price=self.book.price)
+        other_user = User.objects.create_user(username="other", password="password123")
+
+        self.client.force_login(other_user)
+        response = self.client.get(reverse("order_invoice_pdf", args=[order.pk]))
+        self.assertEqual(response.status_code, 404)
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("order_invoice_pdf", args=[order.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("bookie-order-", response["Content-Disposition"])
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
     @override_settings(CHATBOT_RATE_LIMIT_REQUESTS=1, CHATBOT_RATE_LIMIT_WINDOW=60)
     def test_chatbot_api_rate_limits_repeated_requests(self):
         with patch("books.views._build_chatbot", return_value=FakeChatbot()) as build_bot:
