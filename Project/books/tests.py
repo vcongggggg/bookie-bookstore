@@ -277,6 +277,17 @@ class BasicFlowTest(TestCase):
         self.assertEqual(remove_response.json()["wishlist_count"], 0)
         self.assertFalse(Wishlist.objects.filter(user=self.user, book=self.book).exists())
 
+    def test_ajax_wishlist_requires_login_with_json_error(self):
+        for url_name in ("wishlist_add", "wishlist_remove"):
+            response = self.client.post(
+                reverse(url_name, args=[self.book.id]),
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(response.json()["status"], "error")
+            self.assertIn("đăng nhập", response.json()["message"])
+
     def test_physical_checkout_decreases_stock_and_uses_requested_quantity(self):
         self.client.force_login(self.user)
         response = self.client.post(

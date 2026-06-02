@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model, login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import Group
+from django.contrib.auth.views import redirect_to_login
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, F, Q, Sum
@@ -835,8 +836,15 @@ def order_invoice_pdf(request, pk: int):
 # ═══════════════════════════════════════════════════════════════════
 
 
-@login_required
 def wishlist_add(request, book_id: int):
+    if not request.user.is_authenticated:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse({
+                "status": "error",
+                "message": "Vui lòng đăng nhập để sử dụng danh sách yêu thích.",
+            }, status=401)
+        return redirect_to_login(request.get_full_path())
+
     book = get_object_or_404(Book, pk=book_id)
     _, created = Wishlist.objects.get_or_create(user=request.user, book=book)
     wishlist_count = request.user.wishlist_items.count()
@@ -854,8 +862,15 @@ def wishlist_add(request, book_id: int):
     return redirect(next_url)
 
 
-@login_required
 def wishlist_remove(request, book_id: int):
+    if not request.user.is_authenticated:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse({
+                "status": "error",
+                "message": "Vui lòng đăng nhập để sử dụng danh sách yêu thích.",
+            }, status=401)
+        return redirect_to_login(request.get_full_path())
+
     book = get_object_or_404(Book, pk=book_id)
     Wishlist.objects.filter(user=request.user, book=book).delete()
     wishlist_count = request.user.wishlist_items.count()
