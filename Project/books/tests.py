@@ -16,6 +16,7 @@ from django.contrib.auth.models import Group
 from books.category_utils import normalize_category_name
 from books.chatbot import BookieChatbot
 from books.ollama_client import OllamaError
+from books.views import _split_reader_pages
 
 User = get_user_model()
 
@@ -104,6 +105,27 @@ class BasicFlowTest(TestCase):
         progress = ReadingProgress.objects.get(user=self.user, book=self.book)
         self.assertEqual(progress.last_page, 2)
         self.assertTrue(progress.is_finished)
+
+    def test_reader_splits_long_plain_text_into_multiple_pages(self):
+        long_text = " ".join(["Django reader content"] * 260)
+
+        pages = _split_reader_pages(long_text, max_chars=600)
+
+        self.assertGreater(len(pages), 1)
+        self.assertTrue(all(len(page) <= 650 for page in pages))
+
+    def test_reader_context_uses_split_pages_for_long_ebook(self):
+        self.book.is_digital = True
+        self.book.content_text = " ".join(["Crime and Punishment"] * 260)
+        self.book.price = 0
+        self.book.save(update_fields=["is_digital", "content_text", "price"])
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("read_book", args=[self.book.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(response.context["total_pages"], 1)
+        self.assertContains(response, "reader-panel")
 
     def test_digital_book_detail_shows_read_button(self):
         self.book.is_digital = True

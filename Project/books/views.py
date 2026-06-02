@@ -2034,6 +2034,61 @@ def _stream_chat_payload_with_history(request, stream_gen, user_message, found_b
         _set_last_books(request, found_books)
     request.session.save()
 
+
+def _split_reader_pages(content: str, max_chars: int = 1800) -> list[str]:
+    """Split raw ebook text into UI-sized pages without relying on source paragraphs."""
+    text = (content or "").replace("\r\n", "\n").strip()
+    if not text:
+        return ["Nội dung sách đang được cập nhật."]
+
+    raw_blocks = [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
+    pages: list[str] = []
+    current: list[str] = []
+    current_len = 0
+
+    def flush_current():
+        nonlocal current, current_len
+        if current:
+            pages.append("\n\n".join(current).strip())
+            current = []
+            current_len = 0
+
+    def split_long_block(block: str) -> list[str]:
+        words = block.split()
+        chunks: list[str] = []
+        chunk: list[str] = []
+        chunk_len = 0
+        for word in words:
+            extra = len(word) + (1 if chunk else 0)
+            if chunk and chunk_len + extra > max_chars:
+                chunks.append(" ".join(chunk))
+                chunk = [word]
+                chunk_len = len(word)
+            else:
+                chunk.append(word)
+                chunk_len += extra
+        if chunk:
+            chunks.append(" ".join(chunk))
+        return chunks
+
+    for block in raw_blocks:
+        block_len = len(block)
+        if block_len > max_chars:
+            flush_current()
+            pages.extend(split_long_block(block))
+            continue
+
+        separator_len = 2 if current else 0
+        if current and current_len + separator_len + block_len > max_chars:
+            flush_current()
+
+        current.append(block)
+        current_len += separator_len + block_len
+
+    flush_current()
+    return pages or ["Nội dung sách đang được cập nhật."]
+
+
 @csrf_exempt
 def api_chatbot(request) -> JsonResponse:
     """API for Bookie Chatbot."""
@@ -2190,9 +2245,7 @@ def read_book(request, pk: int):
             messages.info(request, "Bạn đang xem bản đọc thử.")
 
     progress, _ = ReadingProgress.objects.get_or_create(user=request.user, book=book)
-    pages = [page.strip() for page in (book.content_text or "").split("\n\n") if page.strip()]
-    if not pages:
-        pages = ["Nội dung sách đang được cập nhật."]
+    pages = _split_reader_pages(book.content_text or "")
     if is_preview:
         preview_limit = max(1, min(5, math.ceil(len(pages) * 0.10)))
         pages = pages[:preview_limit]

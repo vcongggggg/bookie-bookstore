@@ -65,7 +65,7 @@ docker compose exec web python manage.py import_sqlite_books
 - Wishlist.
 - Rating/comment sách.
 - Reading DNA.
-- Ebook reader, preview/full access, lưu tiến độ đọc.
+- Ebook reader giao diện mới: đọc từng trang, progress, chuyển trang bằng nút/phím, tùy chỉnh theme/cỡ chữ/độ rộng, lưu tiến độ đọc.
 - Lọc ebook theo thể loại và miễn phí/trả phí.
 
 ### Quản Trị/Dashboard
@@ -154,7 +154,7 @@ python Project\manage.py test books
 Baseline hiện tại:
 
 ```text
-34 tests OK
+36 tests OK
 ```
 
 Đã test tự động:
@@ -163,7 +163,7 @@ Baseline hiện tại:
 - Trang `/ebooks/` chỉ hiển thị sách digital.
 - Bộ lọc ebook miễn phí/trả phí.
 - Navbar có link `Đọc sách online`.
-- Reader ebook, preview/full access, lưu tiến độ đọc.
+- Reader ebook, preview/full access, chia nội dung dài thành nhiều trang, lưu tiến độ đọc.
 - Checkout sách giấy/digital.
 - Coupon hợp lệ/không hợp lệ.
 - Dashboard URL reverse.
@@ -207,7 +207,7 @@ Chưa test đủ:
 - Mở `/ebooks/` từ Navbar `Đọc sách online`.
 - Tìm kiếm/lọc ebook theo thể loại, miễn phí/trả phí.
 - Mở ebook miễn phí.
-- Kiểm tra reader, chuyển trang, lưu tiến độ.
+- Kiểm tra reader, chuyển trang bằng nút/phím mũi tên, mở panel tùy chỉnh, đổi theme/cỡ chữ/độ rộng, lưu tiến độ.
 - Kiểm tra sách digital trả phí preview nếu chưa mua.
 
 ### Dashboard Và RBAC
@@ -234,7 +234,7 @@ Chưa test đủ:
 - Project đã ổn định hơn, có Docker dev, seed data, import SQLite sang PostgreSQL.
 - RBAC 5 role đã có code, UI gán role và test.
 - Chatbot đã giảm hallucination bằng DB-first search.
-- Test tăng lên 34 case.
+- Test tăng lên 36 case.
 - Các thay đổi chính đều đi qua branch riêng, test rồi merge.
 
 Rủi ro/cần cải thiện:

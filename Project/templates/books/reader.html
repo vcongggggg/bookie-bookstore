@@ -1,197 +1,421 @@
 {% extends "base.html" %}
 {% block title %}Đang đọc: {{ book.title }} - Bookie Reader{% endblock %}
+{% block body_class %}reader-mode{% endblock %}
+{% block main_class %}reader-main{% endblock %}
 
 {% block extra_css %}
 <style>
-    :root {
-        --reader-bg: #0a0a0c;
-        --reader-text: #e0e0e0;
-        --reader-font-size: 1.25rem;
-        --reader-max-width: 800px;
+    body.reader-mode {
+        background: #f4efe6;
+        overflow-x: hidden;
     }
-
-    body[data-theme="light"] {
-        --reader-bg: #fdfdfd;
-        --reader-text: #2d3436;
+    body.reader-mode .navbar-bs,
+    body.reader-mode .footer-bs {
+        display: none !important;
     }
-
-    .reader-container {
-        background: var(--reader-bg);
+    body.reader-mode .chat-widget {
+        display: none;
+    }
+    .reader-main {
         min-height: 100vh;
-        color: var(--reader-text);
-        padding-top: 80px;
-        transition: all 0.3s ease;
+        padding: 0;
     }
-
-    .reader-content {
-        max-width: var(--reader-max-width);
-        margin: 0 auto;
-        padding: 40px 20px;
-        font-family: 'Inter', serif;
-        line-height: 1.8;
-        font-size: var(--reader-font-size);
-        text-align: justify;
+    .reader-shell {
+        min-height: 100vh;
+        background:
+            linear-gradient(90deg, rgba(45,42,38,.05), transparent 14%, transparent 86%, rgba(45,42,38,.05)),
+            var(--reader-page-bg, #f4efe6);
+        color: var(--reader-text, #24211d);
+        transition: background .2s ease, color .2s ease;
     }
-
-    .reader-header {
-        position: fixed;
-        top: 0; left: 0; right: 0;
-        height: 60px;
-        background: rgba(10, 10, 12, 0.8);
-        backdrop-filter: blur(10px);
+    .reader-shell[data-reader-theme="light"] {
+        --reader-page-bg: #f7f2ea;
+        --reader-surface: #fffaf2;
+        --reader-text: #24211d;
+        --reader-muted: #7a7065;
+        --reader-border: #ded4c6;
+        --reader-control: rgba(255,255,255,.82);
+    }
+    .reader-shell[data-reader-theme="sepia"] {
+        --reader-page-bg: #eadbc2;
+        --reader-surface: #fbefd7;
+        --reader-text: #2f2418;
+        --reader-muted: #7d6549;
+        --reader-border: #d2bd9b;
+        --reader-control: rgba(255,247,232,.86);
+    }
+    .reader-shell[data-reader-theme="dark"] {
+        --reader-page-bg: #151515;
+        --reader-surface: #202020;
+        --reader-text: #e8e1d5;
+        --reader-muted: #aaa195;
+        --reader-border: #3a342d;
+        --reader-control: rgba(32,32,32,.9);
+    }
+    .reader-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 1040;
+        min-height: 68px;
+        background: var(--reader-control);
+        backdrop-filter: blur(18px);
+        border-bottom: 1px solid var(--reader-border);
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 20px;
-        z-index: 1000;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
+        gap: 1rem;
+        padding: .75rem clamp(1rem, 3vw, 2rem);
     }
-
-    .reader-footer {
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        padding: 20px;
-        background: linear-gradient(to top, var(--reader-bg), transparent);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .progress-wrapper {
-        width: 100%;
-        max-width: var(--reader-max-width);
-        height: 4px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 2px;
-        overflow: hidden;
-    }
-
-    .progress-bar-fill {
-        height: 100%;
-        background: var(--gradient-1);
-        width: 0%;
-        transition: width 0.3s ease;
-    }
-
-    .page-controls {
-        display: flex;
-        gap: 20px;
-        align-items: center;
-    }
-
-    .btn-reader {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.1);
-        color: var(--reader-text);
-        padding: 8px 20px;
-        border-radius: 30px;
-        transition: all 0.2s ease;
+    .reader-title-wrap {
+        min-width: 0;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: .85rem;
     }
-
-    .btn-reader:hover:not(:disabled) {
-        background: var(--gradient-1);
-        color: white;
-        transform: translateY(-2px);
-    }
-
-    .btn-reader:disabled {
-        opacity: 0.3;
-        cursor: not-allowed;
-    }
-
-    .ai-bubble-btn {
-        position: fixed;
-        right: 30px;
-        bottom: 100px;
-        width: 56px;
-        height: 56px;
+    .reader-back,
+    .reader-icon-btn {
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
-        background: var(--gradient-2);
-        color: white;
-        display: flex;
+        border: 1px solid var(--reader-border);
+        background: var(--reader-control);
+        color: var(--reader-text);
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.5rem;
-        cursor: pointer;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        text-decoration: none;
     }
-
-    .ai-bubble-btn:hover {
-        transform: scale(1.1) rotate(15deg);
+    .reader-back:hover,
+    .reader-icon-btn:hover {
+        color: var(--accent);
+        border-color: rgba(192,86,33,.45);
     }
-
-    .page-num {
-        font-size: 0.9rem;
-        color: var(--text-muted);
+    .reader-book-title {
+        font-weight: 800;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: min(46vw, 520px);
     }
-
-    /* Animation cho trang */
-    .page-fade {
-        animation: fadeIn 0.5s ease;
+    .reader-book-author {
+        color: var(--reader-muted);
+        font-size: .84rem;
     }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+    .reader-actions {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .reader-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        padding: clamp(1rem, 3vw, 2.5rem) 1rem 7rem;
+    }
+    .reader-page {
+        width: min(var(--reader-width, 760px), calc(100vw - 2rem));
+        min-height: min(76vh, 920px);
+        margin: 0 auto;
+        background: var(--reader-surface);
+        border: 1px solid var(--reader-border);
+        box-shadow: 0 24px 80px rgba(45,42,38,.16);
+        padding: clamp(1.35rem, 4vw, 4rem);
+        border-radius: 8px;
+        position: relative;
+    }
+    .reader-page::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        border-radius: inherit;
+        box-shadow: inset 20px 0 32px rgba(45,42,38,.035), inset -20px 0 32px rgba(45,42,38,.03);
+    }
+    .reader-page-content {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: var(--reader-font-size, 20px);
+        line-height: var(--reader-line-height, 1.78);
+        color: var(--reader-text);
+    }
+    .reader-page-content p {
+        margin: 0 0 1.05em;
+        text-align: justify;
+    }
+    .reader-page-content p:last-child {
+        margin-bottom: 0;
+    }
+    .reader-page-kicker {
+        color: var(--reader-muted);
+        font-size: .78rem;
+        text-transform: uppercase;
+        letter-spacing: .12em;
+        margin-bottom: 1.25rem;
+        font-family: Manrope, system-ui, sans-serif;
+    }
+    .reader-bottom {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1030;
+        background: linear-gradient(to top, var(--reader-page-bg) 76%, transparent);
+        padding: 1.25rem 1rem 1rem;
+    }
+    .reader-bottom-inner {
+        width: min(900px, calc(100vw - 2rem));
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 1rem;
+    }
+    .reader-progress {
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(122,112,101,.22);
+        overflow: hidden;
+    }
+    .reader-progress-fill {
+        height: 100%;
+        width: 0;
+        border-radius: inherit;
+        background: var(--gradient-2);
+        transition: width .25s ease;
+    }
+    .reader-page-num {
+        color: var(--reader-muted);
+        font-size: .9rem;
+        text-align: right;
+        white-space: nowrap;
+    }
+    .reader-nav {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+    }
+    .reader-nav-btn {
+        border: 1px solid var(--reader-border);
+        background: var(--reader-control);
+        color: var(--reader-text);
+        min-width: 116px;
+        height: 44px;
+        border-radius: 999px;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .45rem;
+    }
+    .reader-nav-btn:hover:not(:disabled) {
+        color: #fff;
+        background: var(--gradient-2);
+        border-color: transparent;
+    }
+    .reader-nav-btn:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+    }
+    .reader-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 1055;
+        width: min(380px, 92vw);
+        height: 100vh;
+        background: var(--reader-surface);
+        color: var(--reader-text);
+        border-left: 1px solid var(--reader-border);
+        box-shadow: -22px 0 60px rgba(0,0,0,.2);
+        transform: translateX(105%);
+        transition: transform .24s ease;
+        display: flex;
+        flex-direction: column;
+    }
+    .reader-panel.show {
+        transform: translateX(0);
+    }
+    .reader-panel-header {
+        padding: 1rem;
+        border-bottom: 1px solid var(--reader-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .reader-panel-body {
+        padding: 1rem;
+        overflow: auto;
+    }
+    .reader-setting {
+        margin-bottom: 1.25rem;
+    }
+    .reader-setting label {
+        display: block;
+        font-size: .82rem;
+        color: var(--reader-muted);
+        font-weight: 800;
+        margin-bottom: .45rem;
+    }
+    .reader-theme-options {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: .5rem;
+    }
+    .reader-theme-btn {
+        border: 1px solid var(--reader-border);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--reader-text);
+        padding: .65rem .5rem;
+        font-size: .85rem;
+        font-weight: 800;
+    }
+    .reader-theme-btn.active {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(192,86,33,.14);
+    }
+    .page-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+        gap: .45rem;
+    }
+    .page-jump {
+        border: 1px solid var(--reader-border);
+        background: var(--reader-control);
+        color: var(--reader-text);
+        border-radius: 8px;
+        height: 38px;
+        font-weight: 800;
+    }
+    .page-jump.active {
+        color: #fff;
+        background: var(--gradient-2);
+        border-color: transparent;
+    }
+    .reader-preview-card {
+        text-align: center;
+        padding: 3rem 1rem;
+    }
+    .reader-preview-card i {
+        color: var(--gold);
+        font-size: 3.5rem;
+    }
+    .reader-preview-card h2 {
+        font-size: clamp(1.7rem, 3vw, 2.35rem);
+        color: var(--reader-text);
+        margin: 1rem 0 .75rem;
+    }
+    .reader-preview-card p {
+        color: var(--reader-muted);
+        max-width: 560px;
+        margin: 0 auto 1.5rem;
+        text-align: center;
+    }
+    @media (max-width: 720px) {
+        .reader-topbar {
+            align-items: flex-start;
+        }
+        .reader-book-title {
+            max-width: 52vw;
+        }
+        .reader-actions {
+            gap: .35rem;
+        }
+        .reader-page {
+            min-height: 70vh;
+            width: calc(100vw - 1rem);
+            border-radius: 0;
+            padding: 1.25rem;
+        }
+        .reader-bottom-inner {
+            grid-template-columns: 1fr;
+            gap: .75rem;
+        }
+        .reader-page-num {
+            text-align: center;
+        }
+        .reader-nav {
+            justify-content: center;
+            order: -1;
+        }
+        .reader-nav-btn {
+            min-width: 104px;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="reader-container">
-    <div class="reader-header">
-        <div class="d-flex align-items-center gap-3">
-            <a href="{% url 'book_detail' book.pk %}" class="text-white" style="text-decoration:none">
+<div class="reader-shell" id="readerShell" data-reader-theme="sepia">
+    <header class="reader-topbar">
+        <div class="reader-title-wrap">
+            <a href="{% url 'book_detail' book.pk %}" class="reader-back" title="Quay lại chi tiết sách">
                 <i class="bi bi-arrow-left"></i>
             </a>
-            <span class="fw-bold text-truncate" style="max-width: 200px;">{{ book.title }}</span>
+            <div class="min-w-0">
+                <div class="reader-book-title">{{ book.title }}</div>
+                <div class="reader-book-author">{{ book.author }}</div>
+            </div>
         </div>
-        <div class="d-flex align-items-center gap-3">
-            <div class="dropdown">
-                <button class="btn btn-sm btn-outline-light rounded-pill dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-type"></i>
-                </button>
-                <div class="dropdown-menu dropdown-menu-end p-3 glass-panel" style="width: 200px;">
-                    <label class="small text-muted mb-2">Cỡ chữ</label>
-                    <input type="range" class="form-range" min="16" max="32" value="20" id="fontSizeRange">
+        <div class="reader-actions">
+            {% if is_preview %}
+            <span class="meta-chip"><i class="bi bi-eye"></i>Đọc thử</span>
+            {% endif %}
+            <button class="reader-icon-btn" id="decreaseFontBtn" title="Giảm cỡ chữ"><i class="bi bi-dash-lg"></i></button>
+            <button class="reader-icon-btn" id="increaseFontBtn" title="Tăng cỡ chữ"><i class="bi bi-plus-lg"></i></button>
+            <button class="reader-icon-btn" id="togglePanelBtn" title="Tùy chỉnh và danh sách trang"><i class="bi bi-sliders"></i></button>
+        </div>
+    </header>
+
+    <section class="reader-layout">
+        <article class="reader-page" aria-live="polite">
+            <div class="reader-page-kicker" id="readerKicker">Trang 1</div>
+            <div class="reader-page-content" id="pageContent"></div>
+        </article>
+    </section>
+
+    <footer class="reader-bottom">
+        <div class="reader-bottom-inner">
+            <div class="reader-progress" aria-hidden="true">
+                <div class="reader-progress-fill" id="progressBar"></div>
+            </div>
+            <div class="reader-nav">
+                <button class="reader-nav-btn" id="prevBtn"><i class="bi bi-chevron-left"></i>Trước</button>
+                <button class="reader-nav-btn" id="nextBtn">Tiếp<i class="bi bi-chevron-right"></i></button>
+            </div>
+            <div class="reader-page-num" id="pageIndicator">Trang 1 / 1</div>
+        </div>
+    </footer>
+
+    <aside class="reader-panel" id="readerPanel" aria-label="Tùy chỉnh đọc sách">
+        <div class="reader-panel-header">
+            <strong><i class="bi bi-sliders me-2"></i>Tùy chỉnh đọc</strong>
+            <button class="reader-icon-btn" id="closePanelBtn" title="Đóng"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="reader-panel-body">
+            <div class="reader-setting">
+                <label>Giao diện</label>
+                <div class="reader-theme-options">
+                    <button class="reader-theme-btn" data-theme-choice="light">Sáng</button>
+                    <button class="reader-theme-btn" data-theme-choice="sepia">Sepia</button>
+                    <button class="reader-theme-btn" data-theme-choice="dark">Tối</button>
                 </div>
             </div>
-            <button id="theme-toggle-reader" class="btn btn-sm btn-outline-light rounded-pill">
-                <i class="bi bi-brightness-high"></i>
-            </button>
-        </div>
-    </div>
-
-    <div class="reader-content" id="pageContent">
-        <!-- Nội dung sẽ được load bởi JS -->
-    </div>
-
-    <div class="reader-footer">
-        <div class="progress-wrapper">
-            <div class="progress-bar-fill" id="progressBar"></div>
-        </div>
-        <div class="d-flex justify-content-between align-items-center w-100" style="max-width: var(--reader-max-width)">
-            <div class="page-num" id="pageIndicator">Trang 1 / 1</div>
-            <div class="page-controls">
-                <button class="btn-reader" id="prevBtn"><i class="bi bi-chevron-left"></i> Trước</button>
-                <button class="btn-reader" id="nextBtn">Tiếp <i class="bi bi-chevron-right"></i></button>
+            <div class="reader-setting">
+                <label for="fontSizeRange">Cỡ chữ</label>
+                <input type="range" class="form-range" min="16" max="30" value="20" id="fontSizeRange">
             </div>
-            <div class="ai-trigger">
-                 <button class="btn btn-sm btn-outline-info rounded-pill" id="askAI">
-                     <i class="bi bi-robot me-1"></i> Giải thích trang này
-                 </button>
+            <div class="reader-setting">
+                <label for="widthRange">Độ rộng trang</label>
+                <input type="range" class="form-range" min="620" max="980" step="20" value="760" id="widthRange">
+            </div>
+            <div class="reader-setting">
+                <label>Chuyển nhanh</label>
+                <div class="page-list" id="pageList"></div>
             </div>
         </div>
-    </div>
-
-    <div class="ai-bubble-btn" id="floatingChatBtn" title="Hỏi Bookie AI">
-        <i class="bi bi-chat-dots-fill"></i>
-    </div>
+    </aside>
 </div>
 {% endblock %}
 
@@ -200,116 +424,195 @@
     const pages = {{ pages|safe }};
     const isPreview = {{ is_preview|yesno:"true,false" }};
     const bookId = {{ book.pk }};
-    
-    // Nếu là bản xem thử, thêm một trang kêu gọi hành động ở cuối
+
+    let displayPages = pages.slice();
     if (isPreview) {
-        pages.push(`
-            <div class="text-center" style="margin-top: 10vh;">
-                <div style="font-size: 4rem; color: var(--gold); mb-3"><i class="bi bi-unlock"></i></div>
-                <h2 class="fw-bold text-white mb-3">Bạn đã đọc hết phần xem thử!</h2>
-                <p class="text-muted mb-4" style="font-size: 1.1rem;">Cuốn sách này vẫn còn rất nhiều điều thú vị đang chờ đón. Hãy mua bản E-book để mở khóa toàn bộ nội dung.</p>
-                <form action="/cart/add/${bookId}/" method="post" class="d-inline-block">
-                    <input type="hidden" name="csrfmiddlewaretoken" value="${getCookie('csrftoken')}">
-                    <input type="hidden" name="format" value="digital">
-                    <input type="hidden" name="quantity" value="1">
-                    <button type="submit" class="btn btn-gradient px-5 py-3 rounded-pill" style="font-size: 1.2rem;">
-                        <i class="bi bi-cart-check me-2"></i> Mua E-book ngay
-                    </button>
-                </form>
-                <div class="mt-4">
-                    <a href="/books/${bookId}/" class="text-muted small text-decoration-none"><i class="bi bi-arrow-left"></i> Quay lại trang sách</a>
-                </div>
-            </div>
-        `);
+        displayPages.push("__BOOKIE_PREVIEW_END__");
     }
 
-    let currentPage = {{ current_page }};
-    const totalPages = pages.length;
+    const shell = document.getElementById("readerShell");
+    const contentEl = document.getElementById("pageContent");
+    const kickerEl = document.getElementById("readerKicker");
+    const pageIndicator = document.getElementById("pageIndicator");
+    const progressBar = document.getElementById("progressBar");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const panel = document.getElementById("readerPanel");
+    const pageList = document.getElementById("pageList");
+    const fontSizeRange = document.getElementById("fontSizeRange");
+    const widthRange = document.getElementById("widthRange");
+    const settingKey = `bookie_reader_settings_${bookId}`;
+    const progressKey = `bookie_reader_page_${bookId}`;
+    const totalPages = displayPages.length;
+    const readableTotal = isPreview ? Math.max(1, totalPages - 1) : totalPages;
+    let currentPage = Number(localStorage.getItem(progressKey)) || {{ current_page }};
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
 
-    const contentEl = document.getElementById('pageContent');
-    const pageIndicator = document.getElementById('pageIndicator');
-    const progressBar = document.getElementById('progressBar');
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    const fontSizeRange = document.getElementById('fontSizeRange');
-
-    function updateUI() {
-        // Load content
-        contentEl.innerHTML = `<div class="page-fade">${pages[currentPage - 1]}</div>`;
-        
-        // Update stats
-        if (isPreview && currentPage === totalPages) {
-            pageIndicator.textContent = "Mở khóa nội dung";
-            progressBar.style.width = "100%";
-        } else {
-            const displayTotal = isPreview ? totalPages - 1 : totalPages;
-            pageIndicator.textContent = `Trang ${currentPage} / ${displayTotal}`;
-            const progressPct = (currentPage / displayTotal) * 100;
-            progressBar.style.width = `${progressPct}%`;
+    function getSettings() {
+        try {
+            return JSON.parse(localStorage.getItem(settingKey)) || {};
+        } catch (e) {
+            return {};
         }
-        
-        // Buttons state
-        prevBtn.disabled = currentPage === 1;
-        nextBtn.disabled = currentPage === totalPages;
-
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-
-        // Save progress to server
-        saveProgress();
     }
 
-    function saveProgress() {
-        fetch(`/api/v1/books/${bookId}/progress/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({
-                page: currentPage,
-                finished: currentPage === totalPages
-            })
+    function saveSettings(settings) {
+        localStorage.setItem(settingKey, JSON.stringify(settings));
+    }
+
+    function applySettings(settings) {
+        const theme = settings.theme || "sepia";
+        const fontSize = Number(settings.fontSize || 20);
+        const width = Number(settings.width || 760);
+        shell.dataset.readerTheme = theme;
+        shell.style.setProperty("--reader-font-size", `${fontSize}px`);
+        shell.style.setProperty("--reader-width", `${width}px`);
+        fontSizeRange.value = fontSize;
+        widthRange.value = width;
+        document.querySelectorAll(".reader-theme-btn").forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.themeChoice === theme);
         });
     }
 
-    prevBtn.addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            updateUI();
-        }
-    });
+    function renderTextPage(text) {
+        contentEl.innerHTML = "";
+        text.split(/\n\s*\n/).filter(Boolean).forEach((paragraph) => {
+            const p = document.createElement("p");
+            p.textContent = paragraph.trim();
+            contentEl.appendChild(p);
+        });
+    }
 
-    nextBtn.addEventListener('click', () => {
-        if (currentPage < totalPages) {
-            currentPage++;
-            updateUI();
-        }
-    });
+    function renderPreviewEnd() {
+        contentEl.innerHTML = `
+            <div class="reader-preview-card">
+                <i class="bi bi-unlock"></i>
+                <h2>Bạn đã đọc hết phần xem thử</h2>
+                <p>Mua bản E-book để mở khóa toàn bộ nội dung và tiếp tục đọc trên Bookie Reader.</p>
+                <form action="/cart/add/${bookId}/" method="post" class="d-inline-block">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${getCookie("csrftoken")}">
+                    <input type="hidden" name="format" value="digital">
+                    <input type="hidden" name="quantity" value="1">
+                    <button type="submit" class="btn btn-gradient px-4 py-2">
+                        <i class="bi bi-bag-check me-1"></i>Mua E-book
+                    </button>
+                </form>
+            </div>
+        `;
+    }
 
-    fontSizeRange.addEventListener('input', (e) => {
-        contentEl.style.fontSize = `${e.target.value}px`;
-    });
+    function saveProgress() {
+        localStorage.setItem(progressKey, currentPage);
+        fetch(`/api/v1/books/${bookId}/progress/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken")
+            },
+            body: JSON.stringify({
+                page: Math.min(currentPage, readableTotal),
+                finished: !isPreview && currentPage === totalPages
+            })
+        }).catch(() => {});
+    }
 
-    // Keyboard navigation
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowRight') nextBtn.click();
-        if (e.key === 'ArrowLeft') prevBtn.click();
-    });
+    function updatePageList() {
+        pageList.querySelectorAll(".page-jump").forEach((btn) => {
+            btn.classList.toggle("active", Number(btn.dataset.page) === currentPage);
+        });
+    }
 
-    // AI Explanation Trigger
-    document.getElementById('askAI').addEventListener('click', () => {
-        const text = pages[currentPage - 1].substring(0, 500); // Gửi 500 ký tự đầu của trang
-        if (window.openChatbot) {
-            window.openChatbot(`Hãy giải thích nội dung trang này cho tôi: \n\n"${text}..."`);
+    function updateUI() {
+        const page = displayPages[currentPage - 1] || "";
+        if (page === "__BOOKIE_PREVIEW_END__") {
+            kickerEl.textContent = "Mở khóa nội dung";
+            renderPreviewEnd();
         } else {
-            showToast("Đang mở chatbot...", "info");
-            const chatBtn = document.getElementById('chatbot-toggle');
-            if (chatBtn) chatBtn.click();
+            kickerEl.textContent = `Trang ${currentPage}`;
+            renderTextPage(page);
+        }
+
+        const pct = Math.round((currentPage / totalPages) * 100);
+        progressBar.style.width = `${pct}%`;
+        pageIndicator.textContent = page === "__BOOKIE_PREVIEW_END__"
+            ? `Đọc thử ${readableTotal} trang`
+            : `Trang ${currentPage} / ${readableTotal} · ${pct}%`;
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
+        updatePageList();
+        saveProgress();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function goToPage(page) {
+        currentPage = Math.min(Math.max(1, page), totalPages);
+        updateUI();
+    }
+
+    for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "page-jump";
+        btn.dataset.page = i;
+        btn.textContent = isPreview && i === totalPages ? "Mở" : i;
+        btn.addEventListener("click", () => {
+            goToPage(i);
+            panel.classList.remove("show");
+        });
+        pageList.appendChild(btn);
+    }
+
+    prevBtn.addEventListener("click", () => goToPage(currentPage - 1));
+    nextBtn.addEventListener("click", () => goToPage(currentPage + 1));
+    document.getElementById("togglePanelBtn").addEventListener("click", () => panel.classList.add("show"));
+    document.getElementById("closePanelBtn").addEventListener("click", () => panel.classList.remove("show"));
+    document.getElementById("decreaseFontBtn").addEventListener("click", () => {
+        fontSizeRange.value = Math.max(16, Number(fontSizeRange.value) - 1);
+        fontSizeRange.dispatchEvent(new Event("input"));
+    });
+    document.getElementById("increaseFontBtn").addEventListener("click", () => {
+        fontSizeRange.value = Math.min(30, Number(fontSizeRange.value) + 1);
+        fontSizeRange.dispatchEvent(new Event("input"));
+    });
+
+    document.querySelectorAll(".reader-theme-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const settings = getSettings();
+            settings.theme = btn.dataset.themeChoice;
+            saveSettings(settings);
+            applySettings(settings);
+        });
+    });
+
+    fontSizeRange.addEventListener("input", () => {
+        const settings = getSettings();
+        settings.fontSize = Number(fontSizeRange.value);
+        saveSettings(settings);
+        applySettings(settings);
+    });
+    widthRange.addEventListener("input", () => {
+        const settings = getSettings();
+        settings.width = Number(widthRange.value);
+        saveSettings(settings);
+        applySettings(settings);
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.target.matches("input, textarea, select")) return;
+        if (event.key === "ArrowRight" || event.key === " ") {
+            event.preventDefault();
+            goToPage(currentPage + 1);
+        }
+        if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            goToPage(currentPage - 1);
+        }
+        if (event.key === "Escape") {
+            panel.classList.remove("show");
         }
     });
 
-    // Khởi tạo trang đầu tiên
+    applySettings(getSettings());
     updateUI();
 </script>
 {% endblock %}
