@@ -156,7 +156,7 @@ python Project\manage.py test books
 Baseline hiện tại:
 
 ```text
-41 tests OK
+45 tests OK
 ```
 
 Đã test tự động:
@@ -167,6 +167,8 @@ Baseline hiện tại:
 - Trang `/ebooks/` không hiển thị giá hoặc nút mua E-book.
 - Navbar có link `Đọc sách online`.
 - Reader ebook đọc full online miễn phí, chia nội dung dài thành nhiều trang, lưu tiến độ đọc khi đăng nhập.
+- AJAX cart: thêm sách, giới hạn theo tồn kho, xóa item và cập nhật số lượng.
+- AJAX wishlist: thêm/xóa yêu thích và cập nhật số lượng.
 - Checkout chỉ dành cho sách giấy.
 - Coupon hợp lệ/không hợp lệ.
 - Dashboard URL reverse.
@@ -177,7 +179,7 @@ Baseline hiện tại:
 - `robots.txt` và `sitemap.xml` cho SEO cơ bản.
 - Category normalization.
 - Seed reader timeout.
-- 5-role RBAC: Customer, Manager, Support, Admin.
+- 5-role RBAC: Customer, Staff, Manager, Support, Admin.
 - Admin xem hồ sơ user.
 - User đổi mật khẩu.
 
@@ -236,9 +238,10 @@ Chưa test đủ:
 Điểm tốt:
 
 - Project đã ổn định hơn, có Docker dev, seed data, import SQLite sang PostgreSQL.
+- Có GitHub Actions quality gate chạy `manage.py check` và `python manage.py test books` khi push/PR.
 - RBAC 5 role đã có code, UI gán role và test.
 - Chatbot đã giảm hallucination bằng DB-first search.
-- Test tăng lên 41 case.
+- Test tăng lên 45 case.
 - Đã có SEO foundation: `robots.txt`, `sitemap.xml`, structured data cho trang sách.
 - Chatbot API đã bỏ `csrf_exempt` và có test CSRF.
 - Các thay đổi chính đều đi qua branch riêng, test rồi merge.
@@ -253,7 +256,7 @@ Rủi ro/cần cải thiện:
 ## 10. Việc Nên Làm Tiếp
 
 1. Polish UI dashboard users/role bằng tiếng Việt có dấu và badge rõ hơn.
-2. Thêm e2e test cho cart, checkout, wishlist, dashboard role.
+2. Thêm e2e/browser test cho cart, checkout, wishlist, dashboard role.
 3. Tách `views.py` theo domain.
 4. Kiểm thử VNPay sandbox khi có credential.
 5. Thêm trang quản lý role/permission trực quan nếu muốn nâng cấp RBAC sâu hơn.
