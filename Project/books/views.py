@@ -19,7 +19,6 @@ from django.db.models import Avg, Count, F, Q, Sum
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -968,6 +967,20 @@ def about(request):
 
 def contact(request):
     return render(request, "books/contact.html")
+
+
+def robots_txt(request):
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /dashboard/",
+        "Disallow: /cart/",
+        "Disallow: /checkout/",
+        "Disallow: /orders/",
+        "Disallow: /profile/",
+        f"Sitemap: {request.build_absolute_uri(reverse('sitemap'))}",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -2103,7 +2116,6 @@ def _split_reader_pages(content: str, max_chars: int = 1800) -> list[str]:
     return pages or ["Nội dung sách đang được cập nhật."]
 
 
-@csrf_exempt
 def api_chatbot(request) -> JsonResponse:
     """API for Bookie Chatbot."""
     if request.method != "POST":
@@ -2145,7 +2157,6 @@ def api_chatbot(request) -> JsonResponse:
         return JsonResponse({"error": str(e)}, status=400)
 
 
-@csrf_exempt
 def api_chatbot_sync_unused(request) -> JsonResponse:
     """Legacy synchronous fallback kept out of URL routing."""
     if request.method != "POST":
@@ -2187,7 +2198,6 @@ def api_chatbot_sync_unused(request) -> JsonResponse:
         return JsonResponse({"error": str(e)}, status=400)
 
 
-@csrf_exempt
 def api_chatbot_stream(request) -> HttpResponse:
     """True Streaming API for Bookie Chatbot (NDJSON)."""
     if request.method != "POST":

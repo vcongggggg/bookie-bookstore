@@ -1,5 +1,27 @@
 {% extends "base.html" %}
 {% block title %}{{ book.title }} - Smart Bookstore{% endblock %}
+{% block extra_head %}
+{{ block.super }}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Book",
+  "name": "{{ book.title|escapejs }}",
+  "author": {
+    "@type": "Person",
+    "name": "{{ book.author|escapejs }}"
+  },
+  "description": "{{ book.description|default:''|truncatechars:500|escapejs }}",
+  "image": "{% if book.cover_image %}{{ book.cover_image|escapejs }}{% endif %}",
+  "offers": {
+    "@type": "Offer",
+    "price": "{{ book.price|floatformat:2 }}",
+    "priceCurrency": "VND",
+    "availability": "https://schema.org/{% if book.in_stock %}InStock{% else %}OutOfStock{% endif %}"
+  }
+}
+</script>
+{% endblock %}
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">

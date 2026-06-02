@@ -85,6 +85,15 @@ class BasicFlowTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Django Pro")
 
+    def test_book_detail_includes_book_structured_data(self):
+        response = self.client.get(reverse("book_detail", args=[self.book.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'application/ld+json')
+        self.assertContains(response, '"@type": "Book"')
+        self.assertContains(response, self.book.title)
+        self.assertContains(response, '"priceCurrency": "VND"')
+
     def test_reader_and_progress_api_for_digital_book(self):
         self.book.is_digital = True
         self.book.content_text = "Trang 1\n\nTrang 2"
@@ -365,6 +374,31 @@ class BasicFlowTest(TestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertIn("bookie-order-", response["Content-Disposition"])
         self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_robots_txt_points_to_sitemap(self):
+        response = self.client.get(reverse("robots_txt"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("text/plain"))
+        self.assertContains(response, "Disallow: /dashboard/")
+        self.assertContains(response, "Sitemap: http://testserver/sitemap.xml")
+
+    def test_sitemap_lists_public_book_and_category_pages(self):
+        response = self.client.get(reverse("sitemap"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"/books/{self.book.pk}/")
+        self.assertContains(response, f"/categories/{self.category.pk}/")
+
+    def test_chatbot_api_requires_csrf_token_when_middleware_enforces_it(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        response = csrf_client.post(
+            reverse("api_chatbot"),
+            data=json.dumps({"message": "hello"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     @override_settings(CHATBOT_RATE_LIMIT_REQUESTS=1, CHATBOT_RATE_LIMIT_WINDOW=60)
     def test_chatbot_api_rate_limits_repeated_requests(self):
