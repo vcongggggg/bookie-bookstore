@@ -24,6 +24,10 @@ class BookieChatbot:
         self._client = client
         self._max_turns = max_turns
 
+    def _get_fallback_books(self) -> list[dict[str, Any]]:
+        db_books = Book.objects.annotate(sales=Count("order_items")).order_by("-sales", "title")[:3]
+        return [_format_book_result(book) for book in db_books]
+
     def get_response(
         self,
         text: str,
@@ -35,7 +39,12 @@ class BookieChatbot:
             return catalog_response
 
         found_books = [_format_book_result(book) for book in self._find_books(text, limit=3)]
-        prompt = self.build_prompt(text, history, found_books)
+        is_fallback = False
+        if not found_books:
+            found_books = self._get_fallback_books()
+            is_fallback = True
+
+        prompt = self.build_prompt(text, history, found_books, is_fallback=is_fallback)
         try:
             raw = self._client.generate(prompt)
         except Exception:
@@ -92,6 +101,7 @@ class BookieChatbot:
         text: str,
         history: Sequence[ChatMessage],
         found_books: list[dict[str, Any]] | None = None,
+        is_fallback: bool = False,
     ) -> str:
         user_name = self.user.username if self.user and self.user.is_authenticated else "Khách"
         clipped_history = list(history)[-self._max_turns * 2 :]
@@ -101,11 +111,6 @@ class BookieChatbot:
             content = item.get("content", "").strip()
             if content:
                 history_lines.append(f"{role}: {content}")
-
-        fallback_books = []
-        if not found_books:
-            db_books = Book.objects.annotate(sales=Count("order_items")).order_by("-sales", "title")[:3]
-            fallback_books = [_format_book_result(book) for book in db_books]
 
         rules = [
             "Bạn là Bookie, trợ lý thân thiện của nhà sách Bookie.",
@@ -117,15 +122,15 @@ class BookieChatbot:
 
         if found_books:
             titles = ", ".join([f"'{book['title']}' (Giá: {book['price']}, Link: {book['url']})" for book in found_books])
-            rules.append(f"Các sách phù hợp tìm thấy trong database: {titles}.")
-            rules.append("Hãy giới thiệu các sách này cho người dùng.")
-        else:
-            titles = ", ".join([f"'{book['title']}' (Giá: {book['price']}, Link: {book['url']})" for book in fallback_books])
-            rules.append(
-                f"Nếu người dùng đang hỏi tìm sách hoặc thể loại/chủ đề sách cụ thể, nhưng không có sách nào khớp trong database: "
-                f"bạn BẮT BUỘC phải thông báo rõ là Bookie hiện chưa có sách hoặc thể loại này, "
-                f"sau đó giới thiệu cho họ các sách khác hiện đang có sẵn tại Bookie dưới đây làm gợi ý thay thế: {titles}."
-            )
+            if not is_fallback:
+                rules.append(f"Các sách phù hợp tìm thấy trong database: {titles}.")
+                rules.append("Hãy giới thiệu các sách này cho người dùng.")
+            else:
+                rules.append(
+                    f"Không tìm thấy sách nào khớp với yêu cầu cụ thể của người dùng trong database. "
+                    f"Bạn BẮT BUỘC phải thông báo rõ là Bookie hiện chưa có sách hoặc thể loại này, "
+                    f"sau đó giới thiệu cho họ các sách khác hiện đang có sẵn tại Bookie dưới đây làm gợi ý thay thế: {titles}."
+                )
 
         # Action instructions
         action_instructions = (

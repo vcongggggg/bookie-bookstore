@@ -2403,7 +2403,15 @@ def api_chatbot_stream(request) -> HttpResponse:
             )
 
         found_books = bot.prepare_stream_context(user_message)
-        prompt = bot.build_prompt(user_message, history, found_books)
+        is_fallback = False
+        if not found_books and isinstance(bot, BookieChatbot):
+            found_books = bot._get_fallback_books()
+            is_fallback = True
+
+        if isinstance(bot, BookieChatbot):
+            prompt = bot.build_prompt(user_message, history, found_books, is_fallback=is_fallback)
+        else:
+            prompt = bot.build_prompt(user_message, history, found_books)
         stream_gen = bot._client.stream_generate(prompt)
 
         return StreamingHttpResponse(
