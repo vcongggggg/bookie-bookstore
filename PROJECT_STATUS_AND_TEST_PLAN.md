@@ -65,6 +65,7 @@ docker compose exec web python manage.py import_sqlite_books
 - Wishlist.
 - Rating/comment sách.
 - Reading DNA.
+- Lịch sử đọc sách trong menu tài khoản, hiển thị tiến độ và nút đọc tiếp.
 - Ebook reader giao diện mới: đọc online miễn phí, đọc từng trang, progress, chuyển trang bằng nút/phím, tùy chỉnh theme/cỡ chữ/độ rộng, lưu tiến độ đọc khi đã đăng nhập.
 - Giá sách trên catalog/chi tiết/giỏ hàng là giá sách giấy; đọc online không có giá E-book riêng.
 
@@ -85,6 +86,7 @@ docker compose exec web python manage.py import_sqlite_books
 - Nếu không có sách trong kho thì nói chưa tìm thấy, không bịa tên sách/giá.
 - Streaming endpoint có fallback khi Ollama lỗi.
 - Rate limit cho cả chatbot thường và streaming.
+- Chatbot API dùng CSRF protection, frontend gửi `X-CSRFToken` khi gọi API.
 
 ## 5. Phân Quyền
 
@@ -154,12 +156,13 @@ python Project\manage.py test books
 Baseline hiện tại:
 
 ```text
-36 tests OK
+41 tests OK
 ```
 
 Đã test tự động:
 
 - Trang chủ và chi tiết sách.
+- Trang chi tiết sách có JSON-LD `Book` structured data.
 - Trang `/ebooks/` chỉ hiển thị sách digital.
 - Trang `/ebooks/` không hiển thị giá hoặc nút mua E-book.
 - Navbar có link `Đọc sách online`.
@@ -168,8 +171,10 @@ Baseline hiện tại:
 - Coupon hợp lệ/không hợp lệ.
 - Dashboard URL reverse.
 - Reading DNA context.
+- Lịch sử đọc sách theo user.
 - Hóa đơn PDF và quyền chủ đơn.
-- Chatbot rate limit, fallback, DB-first catalog search.
+- Chatbot CSRF protection, rate limit, fallback, DB-first catalog search.
+- `robots.txt` và `sitemap.xml` cho SEO cơ bản.
 - Category normalization.
 - Seed reader timeout.
 - 5-role RBAC: Customer, Manager, Support, Admin.
@@ -233,14 +238,15 @@ Chưa test đủ:
 - Project đã ổn định hơn, có Docker dev, seed data, import SQLite sang PostgreSQL.
 - RBAC 5 role đã có code, UI gán role và test.
 - Chatbot đã giảm hallucination bằng DB-first search.
-- Test tăng lên 36 case.
+- Test tăng lên 41 case.
+- Đã có SEO foundation: `robots.txt`, `sitemap.xml`, structured data cho trang sách.
+- Chatbot API đã bỏ `csrf_exempt` và có test CSRF.
 - Các thay đổi chính đều đi qua branch riêng, test rồi merge.
 
 Rủi ro/cần cải thiện:
 
 - `books/views.py` còn lớn, nên tách theo domain về lâu dài.
 - Một số template/text vẫn còn không dấu hoặc chưa đồng nhất.
-- Một số endpoint chatbot còn `csrf_exempt`, cần review.
 - Dashboard RBAC có đủ dùng nhưng chưa phải enterprise-grade.
 - Cần e2e/browser test cho UX thật.
 
@@ -248,7 +254,7 @@ Rủi ro/cần cải thiện:
 
 1. Polish UI dashboard users/role bằng tiếng Việt có dấu và badge rõ hơn.
 2. Thêm e2e test cho cart, checkout, wishlist, dashboard role.
-3. Review/bỏ `csrf_exempt` nếu không cần.
-4. Tách `views.py` theo domain.
-5. Kiểm thử VNPay sandbox khi có credential.
-6. Thêm trang quản lý role/permission trực quan nếu muốn nâng cấp RBAC sâu hơn.
+3. Tách `views.py` theo domain.
+4. Kiểm thử VNPay sandbox khi có credential.
+5. Thêm trang quản lý role/permission trực quan nếu muốn nâng cấp RBAC sâu hơn.
+6. Bổ sung monitoring/logging lỗi production nếu deploy thật.
