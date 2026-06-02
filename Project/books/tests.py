@@ -10,7 +10,7 @@ from django.test import TestCase, Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
-from books.models import Book, Category, Coupon, Order, OrderItem, ReadingProgress
+from books.models import Book, Category, Coupon, Order, OrderItem, ReadingProgress, Wishlist
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from books.category_utils import normalize_category_name
@@ -226,6 +226,56 @@ class BasicFlowTest(TestCase):
         self.assertEqual(OrderItem.objects.count(), 0)
         self.book.refresh_from_db()
         self.assertEqual(self.book.stock, 10)
+
+    def test_ajax_add_to_cart_returns_count_and_caps_at_stock(self):
+        response = self.client.post(
+            reverse("add_to_cart", args=[self.book.id]),
+            data={"quantity": "50"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["cart_count"], self.book.stock)
+        self.assertEqual(self.client.session["cart"][f"{self.book.id}_physical"], self.book.stock)
+
+    def test_ajax_remove_from_cart_updates_count(self):
+        self.client.post(
+            reverse("add_to_cart", args=[self.book.id]),
+            data={"quantity": "2"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        response = self.client.get(
+            reverse("remove_from_cart", args=[f"{self.book.id}_physical"]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["cart_count"], 0)
+        self.assertNotIn(f"{self.book.id}_physical", self.client.session.get("cart", {}))
+
+    def test_ajax_wishlist_add_and_remove_updates_count(self):
+        self.client.force_login(self.user)
+
+        add_response = self.client.post(
+            reverse("wishlist_add", args=[self.book.id]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(add_response.status_code, 200)
+        self.assertEqual(add_response.json()["action"], "added")
+        self.assertEqual(add_response.json()["wishlist_count"], 1)
+        self.assertTrue(Wishlist.objects.filter(user=self.user, book=self.book).exists())
+
+        remove_response = self.client.post(
+            reverse("wishlist_remove", args=[self.book.id]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(remove_response.status_code, 200)
+        self.assertEqual(remove_response.json()["action"], "removed")
+        self.assertEqual(remove_response.json()["wishlist_count"], 0)
+        self.assertFalse(Wishlist.objects.filter(user=self.user, book=self.book).exists())
 
     def test_physical_checkout_decreases_stock_and_uses_requested_quantity(self):
         self.client.force_login(self.user)
@@ -620,6 +670,18 @@ class RBACTest(TestCase):
 
         response = self.client.get(reverse("dashboard_users"))
         self.assertEqual(response.status_code, 302)
+
+    def test_staff_can_view_core_dashboard_data_without_management_actions(self):
+        staff = User.objects.create_user(username="staff", password="password123", is_staff=True)
+        staff.groups.add(Group.objects.get(name="Staff"))
+        self.client.force_login(staff)
+
+        self.assertEqual(self.client.get(reverse("dashboard_books")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("dashboard_orders")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("dashboard_coupons")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("dashboard_users")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("dashboard_book_create")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("dashboard_coupon_create")).status_code, 302)
 
     def test_admin_can_view_user_profile_detail(self):
         self.client.force_login(self.admin)
