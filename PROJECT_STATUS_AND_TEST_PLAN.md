@@ -6,6 +6,17 @@ Bookie là website bán sách xây bằng Django. Source code chạy web nằm t
 
 Mục tiêu hiện tại là ổn định một web bán sách có thể demo/vận hành nhỏ: catalog sách, giỏ hàng, checkout, đơn hàng, ebook reader, hồ sơ người dùng, dashboard quản trị, phân quyền 5 role, chatbot hỗ trợ vừa đủ và dữ liệu mẫu có thể seed/import lại.
 
+## 1.1. Trạng Thái Mới Nhất
+
+- Nhánh chính hiện tại: `main`, đã push lên GitHub.
+- Baseline kiểm thử hiện tại: `46 tests OK`.
+- Đã thêm trang `Lịch sử đọc sách` trong menu tài khoản.
+- Đã thêm GitHub Actions quality gate để tự chạy `manage.py check` và `python manage.py test books`.
+- Đã tăng bảo mật chatbot API: bỏ `csrf_exempt`, frontend gửi CSRF token, có test bảo vệ.
+- Đã thêm SEO foundation: `robots.txt`, `sitemap.xml`, JSON-LD `Book` cho trang chi tiết sách.
+- Đã bổ sung test AJAX cart/wishlist và xử lý JSON `401` khi khách chưa đăng nhập bấm yêu thích.
+- Nhánh thử nghiệm `experiment/html-ebook-reader` vẫn chưa merge vào `main`; chỉ giữ để xem thử phần ebook HTML/có ảnh sau.
+
 ## 2. Stack Và Cách Chạy
 
 - Backend: Django 6, Python 3.12.
@@ -209,6 +220,8 @@ Chưa test đủ:
 - Chỉnh sửa hồ sơ.
 - Đổi mật khẩu tại `/profile/password/`.
 - Mở wishlist, orders, reading DNA.
+- Mở menu tài khoản > `Lịch sử đọc`, kiểm tra sách đang đọc có tiến độ và nút `Đọc tiếp`.
+- Khi chưa đăng nhập, bấm yêu thích bằng AJAX phải hiển thị thông báo đăng nhập thay vì lỗi giao diện.
 
 ### Ebook
 
@@ -233,6 +246,13 @@ Chưa test đủ:
 - Hỏi chủ đề không có trong DB: phải nói chưa tìm thấy, không bịa.
 - Tắt Ollama và kiểm tra fallback.
 - Gửi nhiều request nhanh để kiểm tra rate limit.
+
+### SEO Và Hạ Tầng
+
+- Mở `/robots.txt`, kiểm tra có link `Sitemap: .../sitemap.xml`.
+- Mở `/sitemap.xml`, kiểm tra có URL trang chủ, sách và thể loại.
+- Mở chi tiết một sách, kiểm tra source có script `application/ld+json`.
+- Kiểm tra GitHub Actions sau khi push: workflow `Django quality gate` phải pass.
 
 ## 9. Nhận Xét Chất Lượng Hiện Tại
 
