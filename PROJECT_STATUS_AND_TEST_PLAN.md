@@ -156,7 +156,7 @@ python Project\manage.py test books
 Baseline hiện tại:
 
 ```text
-45 tests OK
+46 tests OK
 ```
 
 Đã test tự động:
@@ -169,6 +169,7 @@ Baseline hiện tại:
 - Reader ebook đọc full online miễn phí, chia nội dung dài thành nhiều trang, lưu tiến độ đọc khi đăng nhập.
 - AJAX cart: thêm sách, giới hạn theo tồn kho, xóa item và cập nhật số lượng.
 - AJAX wishlist: thêm/xóa yêu thích và cập nhật số lượng.
+- AJAX wishlist khi chưa đăng nhập trả JSON lỗi `401` thay vì redirect HTML khó xử lý.
 - Checkout chỉ dành cho sách giấy.
 - Coupon hợp lệ/không hợp lệ.
 - Dashboard URL reverse.
@@ -241,7 +242,7 @@ Chưa test đủ:
 - Có GitHub Actions quality gate chạy `manage.py check` và `python manage.py test books` khi push/PR.
 - RBAC 5 role đã có code, UI gán role và test.
 - Chatbot đã giảm hallucination bằng DB-first search.
-- Test tăng lên 45 case.
+- Test tăng lên 46 case.
 - Đã có SEO foundation: `robots.txt`, `sitemap.xml`, structured data cho trang sách.
 - Chatbot API đã bỏ `csrf_exempt` và có test CSRF.
 - Các thay đổi chính đều đi qua branch riêng, test rồi merge.
