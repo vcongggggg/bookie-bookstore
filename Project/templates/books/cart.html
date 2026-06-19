@@ -25,14 +25,14 @@
                         <span class="price" style="font-size:.95rem">{{ row.book.price|floatformat:0 }}₫</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <input type="number" name="qty_{{ row.book.pk }}" value="{{ row.quantity }}" min="0" max="{{ row.book.stock }}" class="form-control text-center" style="width:70px;border-radius:var(--radius-sm)">
+                        <input type="number" name="qty_{{ row.key }}" value="{{ row.quantity }}" min="0" max="{{ row.book.stock }}" class="form-control text-center" style="width:70px;border-radius:var(--radius-sm)">
                     </div>
                     <div class="text-end" style="min-width:100px">
                         <span class="fw-bold" style="color:var(--primary)">{{ row.subtotal|floatformat:0 }}₫</span>
                     </div>
-                    <a href="{% url 'remove_from_cart' row.book.pk %}" class="btn-icon" style="color:var(--danger);background:rgba(225,112,85,.1)" title="Xóa">
+                    <button type="submit" name="remove_item" value="{{ row.key }}" class="btn-icon border-0" style="color:var(--danger);background:rgba(225,112,85,.1)" title="Xóa">
                         <i class="bi bi-trash3"></i>
-                    </a>
+                    </button>
                 </div>
             </div>
             {% endfor %}

@@ -2,6 +2,7 @@ import csv
 import html as html_lib
 import json
 import re
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from collections import Counter, defaultdict
 from datetime import timedelta
@@ -19,10 +20,12 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.views import redirect_to_login
 from django.core.cache import cache
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Avg, Count, F, Q, Sum
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -43,6 +46,39 @@ from .ollama_client import OllamaClient, OllamaConfig, OllamaError
 from .rbac import INTERNAL_ROLES, ROLE_CHOICES, primary_role
 
 User = get_user_model()
+
+
+def _client_actor(request: HttpRequest) -> str:
+    if request.user.is_authenticated:
+        return f"user:{request.user.pk}"
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    ip_address = forwarded_for.split(",", 1)[0].strip() if forwarded_for else request.META.get("REMOTE_ADDR", "unknown")
+    return f"ip:{ip_address or 'unknown'}"
+
+
+def _rate_limit_response(
+    request: HttpRequest,
+    scope: str,
+    limit: int,
+    window: int,
+    message: str,
+):
+    if limit <= 0 or window <= 0:
+        return None
+
+    key = f"rate_limit:{scope}:{_client_actor(request)}"
+    if cache.add(key, 1, timeout=window):
+        return None
+
+    try:
+        count = cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=window)
+        return None
+
+    if count > limit:
+        return JsonResponse({"error": message, "retry_after": window}, status=429)
+    return None
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -296,6 +332,7 @@ def _books_queryset(search=None, category_id=None, sort="title"):
 # ═══════════════════════════════════════════════════════════════════
 
 
+@ensure_csrf_cookie
 def home(request):
     """Trang chủ: hiển thị các danh mục sách khác nhau dưới dạng Slider."""
     books = Book.objects.all().order_by("-created_at")[:12]
@@ -324,6 +361,7 @@ def home(request):
     return render(request, "books/home.html", context)
 
 
+@ensure_csrf_cookie
 def book_list(request):
     search = request.GET.get("q", "").strip()
     category_id = request.GET.get("category")
@@ -348,6 +386,7 @@ def book_list(request):
     return render(request, "books/book_list.html", context)
 
 
+@ensure_csrf_cookie
 def ebook_list(request):
     search = request.GET.get("q", "").strip()
     category_id = request.GET.get("category")
@@ -381,11 +420,13 @@ def ebook_list(request):
     return render(request, "books/ebook_list.html", context)
 
 
+@ensure_csrf_cookie
 def category_list(request):
     categories = Category.objects.annotate(book_count=Count("books")).order_by("name")
     return render(request, "books/category_list.html", {"categories": categories})
 
 
+@ensure_csrf_cookie
 def category_detail(request, pk: int):
     category = get_object_or_404(Category, pk=pk)
     sort = request.GET.get("sort", "title")
@@ -397,6 +438,7 @@ def category_detail(request, pk: int):
     return render(request, "books/category_detail.html", context)
 
 
+@ensure_csrf_cookie
 def book_detail(request, pk: int):
     book = get_object_or_404(Book, pk=pk)
     _push_recently_viewed(request, book.pk)
@@ -476,6 +518,16 @@ def register(request):
     if request.user.is_authenticated:
         return redirect("home")
     if request.method == "POST":
+        limited = _rate_limit_response(
+            request,
+            "register",
+            settings.REGISTER_RATE_LIMIT_REQUESTS,
+            settings.REGISTER_RATE_LIMIT_WINDOW,
+            "Bạn đăng ký quá nhanh. Vui lòng chờ một lúc rồi thử lại.",
+        )
+        if limited:
+            return limited
+
         form = RegisterForm(request.POST)
         if form.is_valid():
             user = form.save()
@@ -517,6 +569,7 @@ def cart_view(request):
     return render(request, "books/cart.html", context)
 
 
+@require_POST
 def add_to_cart(request, book_id: int):
     book = get_object_or_404(Book, pk=book_id)
 
@@ -564,10 +617,16 @@ def add_to_cart(request, book_id: int):
     return redirect("cart")
 
 
+@require_POST
 def update_cart(request):
-    if request.method != "POST":
-        return redirect("cart")
     cart = _get_cart(request)
+    remove_item = request.POST.get("remove_item")
+    if remove_item in cart:
+        del cart[remove_item]
+        _set_cart(request, cart)
+        messages.info(request, "Đã xóa sản phẩm khỏi giỏ.")
+        return redirect("cart")
+
     for key in list(cart.keys()):
         qty = request.POST.get(f"qty_{key}")
         if qty is not None:
@@ -584,6 +643,7 @@ def update_cart(request):
     return redirect("cart")
 
 
+@require_POST
 def remove_from_cart(request, item_key: str):
     cart = _get_cart(request)
     if item_key in cart:
@@ -605,49 +665,74 @@ def checkout(request):
     subtotal = sum(x["subtotal"] for x in items)
     
     if request.method == "POST":
+        limited = _rate_limit_response(
+            request,
+            "checkout",
+            settings.CHECKOUT_RATE_LIMIT_REQUESTS,
+            settings.CHECKOUT_RATE_LIMIT_WINDOW,
+            "Bạn thử đặt hàng quá nhanh. Vui lòng chờ một lúc rồi thử lại.",
+        )
+        if limited:
+            return limited
+
         form = CheckoutForm(request.POST)
         if form.is_valid():
             coupon_code = form.cleaned_data.get("coupon_code", "").strip()
-            discount_amount = 0
-            applied_coupon = None
-            
-            if coupon_code:
-                try:
-                    coupon = Coupon.objects.get(code__iexact=coupon_code)
-                    if coupon.is_valid and subtotal >= coupon.min_order_amount:
-                        applied_coupon = coupon
-                        final_total = coupon.apply_discount(subtotal)
-                        discount_amount = subtotal - final_total
-                    else:
-                        messages.warning(request, "Mã giảm giá không hợp lệ hoặc không đủ điều kiện.")
-                        # Proceed without coupon if invalid during final submission? 
-                        # Usually better to error out if they intended to use it.
-                except Coupon.DoesNotExist:
-                    messages.warning(request, "Mã giảm giá không tồn tại.")
 
-            order = Order.objects.create(
-                user=request.user,
-                shipping_address=form.cleaned_data["shipping_address"],
-                note=form.cleaned_data.get("note", ""),
-                coupon=applied_coupon,
-                discount_amount=discount_amount,
-                payment_method=form.cleaned_data["payment_method"],
-            )
-            for row in items:
-                OrderItem.objects.create(
-                    order=order,
-                    book=row["book"],
-                    quantity=row["quantity"],
-                    price=row["book"].price,
-                    is_digital_purchase=False,
+            with transaction.atomic():
+                locked_books = {
+                    book.pk: book
+                    for book in Book.objects.select_for_update().filter(
+                        pk__in=[row["book"].pk for row in items]
+                    )
+                }
+                locked_items = []
+                for row in items:
+                    book = locked_books.get(row["book"].pk)
+                    if not book or row["quantity"] > book.stock:
+                        messages.error(
+                            request,
+                            f"'{row['book'].title}' không đủ hàng cho số lượng bạn chọn.",
+                        )
+                        return redirect("cart")
+                    locked_items.append({**row, "book": book, "subtotal": book.price * row["quantity"]})
+
+                locked_subtotal = sum(row["subtotal"] for row in locked_items)
+                discount_amount = 0
+                applied_coupon = None
+
+                if coupon_code:
+                    try:
+                        coupon = Coupon.objects.select_for_update().get(code__iexact=coupon_code)
+                        if coupon.is_valid and locked_subtotal >= coupon.min_order_amount:
+                            applied_coupon = coupon
+                            final_total = coupon.apply_discount(locked_subtotal)
+                            discount_amount = locked_subtotal - final_total
+                        else:
+                            messages.warning(request, "Mã giảm giá không hợp lệ hoặc không đủ điều kiện.")
+                    except Coupon.DoesNotExist:
+                        messages.warning(request, "Mã giảm giá không tồn tại.")
+
+                order = Order.objects.create(
+                    user=request.user,
+                    shipping_address=form.cleaned_data["shipping_address"],
+                    note=form.cleaned_data.get("note", ""),
+                    coupon=applied_coupon,
+                    discount_amount=discount_amount,
+                    payment_method=form.cleaned_data["payment_method"],
                 )
-                book = row["book"]
-                book.stock = max(0, book.stock - row["quantity"])
-                book.save(update_fields=["stock"])
+                for row in locked_items:
+                    OrderItem.objects.create(
+                        order=order,
+                        book=row["book"],
+                        quantity=row["quantity"],
+                        price=row["book"].price,
+                        is_digital_purchase=False,
+                    )
+                    Book.objects.filter(pk=row["book"].pk).update(stock=F("stock") - row["quantity"])
 
-            if applied_coupon:
-                applied_coupon.used_count += 1
-                applied_coupon.save(update_fields=["used_count"])
+                if applied_coupon:
+                    Coupon.objects.filter(pk=applied_coupon.pk).update(used_count=F("used_count") + 1)
 
             _set_cart(request, {})
             
@@ -671,28 +756,41 @@ def checkout(request):
 @require_POST
 def api_apply_coupon(request):
     """AJAX API to validate and calculate coupon discount."""
+    limited = _rate_limit_response(
+        request,
+        "coupon",
+        settings.COUPON_RATE_LIMIT_REQUESTS,
+        settings.COUPON_RATE_LIMIT_WINDOW,
+        "Bạn thử mã giảm giá quá nhanh. Vui lòng chờ một lúc rồi thử lại.",
+    )
+    if limited:
+        return limited
+
     coupon_code = request.POST.get("code", "").strip()
-    subtotal = float(request.POST.get("subtotal", 0))
+    try:
+        subtotal = Decimal(str(request.POST.get("subtotal", "0")))
+    except (InvalidOperation, TypeError):
+        return JsonResponse({"status": "error", "message": "Giá trị đơn hàng không hợp lệ."}, status=400)
     
     try:
         coupon = Coupon.objects.get(code__iexact=coupon_code)
         if not coupon.is_valid:
             return JsonResponse({"status": "error", "message": "Mã giảm giá đã hết hạn hoặc hết lượt dùng."})
         
-        if subtotal < float(coupon.min_order_amount):
+        if subtotal < coupon.min_order_amount:
             return JsonResponse({
                 "status": "error", 
                 "message": f"Đơn hàng tối thiểu {coupon.min_order_amount:,.0f}₫ để dùng mã này."
             })
             
-        final_total = float(coupon.apply_discount(subtotal))
+        final_total = coupon.apply_discount(subtotal)
         discount = subtotal - final_total
         
         return JsonResponse({
             "status": "ok",
             "message": f"Áp dụng thành công: {coupon}",
-            "discount": discount,
-            "final_total": final_total,
+            "discount": float(discount),
+            "final_total": float(final_total),
             "coupon_code": coupon.code
         })
     except Coupon.DoesNotExist:
@@ -979,10 +1077,12 @@ def api_search(request):
 # ═══════════════════════════════════════════════════════════════════
 
 
+@ensure_csrf_cookie
 def about(request):
     return render(request, "books/about.html")
 
 
+@ensure_csrf_cookie
 def contact(request):
     return render(request, "books/contact.html")
 
@@ -1799,21 +1899,24 @@ def dashboard_audit_logs(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_POST
 def cancel_order(request, pk: int):
-    order = get_object_or_404(Order, pk=pk, user=request.user)
-    if order.status in ("pending", "confirmed"):
-        order.status = "cancelled"
-        order.save(update_fields=["status"])
-        # Restore stock
-        for item in order.items.all():
-            item.book.stock += item.quantity
-            item.book.save(update_fields=["stock"])
-        # Restore coupon usage
-        if order.coupon:
-            order.coupon.used_count = max(0, order.coupon.used_count - 1)
-            order.coupon.save(update_fields=["used_count"])
-        messages.success(request, f"Da huy don hang #{order.pk}.")
-    else:
-        messages.error(request, "Khong the huy don hang o trang thai nay.")
+    with transaction.atomic():
+        order = get_object_or_404(
+            Order.objects.select_for_update().select_related("coupon"),
+            pk=pk,
+            user=request.user,
+        )
+        if order.status in ("pending", "confirmed"):
+            order.status = "cancelled"
+            order.save(update_fields=["status"])
+            for item in order.items.select_related("book"):
+                Book.objects.filter(pk=item.book_id).update(stock=F("stock") + item.quantity)
+            if order.coupon_id:
+                Coupon.objects.filter(pk=order.coupon_id, used_count__gt=0).update(
+                    used_count=F("used_count") - 1
+                )
+            messages.success(request, f"Da huy don hang #{order.pk}.")
+        else:
+            messages.error(request, "Khong the huy don hang o trang thai nay.")
     return redirect("order_detail", pk=order.pk)
 
 
@@ -2007,34 +2110,13 @@ def _build_chatbot(request) -> BookieChatbot:
 
 
 def _chatbot_rate_limit_response(request):
-    limit = int(getattr(settings, "CHATBOT_RATE_LIMIT_REQUESTS", 20))
-    window = int(getattr(settings, "CHATBOT_RATE_LIMIT_WINDOW", 60))
-    if limit <= 0 or window <= 0:
-        return None
-
-    if request.user.is_authenticated:
-        actor = f"user:{request.user.pk}"
-    else:
-        actor = f"ip:{request.META.get('REMOTE_ADDR', 'unknown')}"
-    key = f"chatbot_rate:{actor}"
-
-    if cache.add(key, 1, timeout=window):
-        return None
-    try:
-        count = cache.incr(key)
-    except ValueError:
-        cache.set(key, 1, timeout=window)
-        return None
-
-    if count > limit:
-        return JsonResponse(
-            {
-                "error": "Bạn gửi yêu cầu quá nhanh. Vui lòng thử lại sau ít phút.",
-                "retry_after": window,
-            },
-            status=429,
-        )
-    return None
+    return _rate_limit_response(
+        request,
+        "chatbot",
+        int(getattr(settings, "CHATBOT_RATE_LIMIT_REQUESTS", 20)),
+        int(getattr(settings, "CHATBOT_RATE_LIMIT_WINDOW", 60)),
+        "Bạn gửi yêu cầu quá nhanh. Vui lòng thử lại sau ít phút.",
+    )
 
 
 def _stream_chat_payload(payload_or_generator, is_real_stream=False, chunk_size: int = 24) -> Iterable[bytes]:

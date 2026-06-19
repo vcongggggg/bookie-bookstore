@@ -24,13 +24,18 @@ load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dynspj@8$04sr*46voc83@7ic&f5&v0^(i*rd_6(w_xt2w*jh^')
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-dev-only-change-me'
+    else:
+        raise RuntimeError('SECRET_KEY must be set when DEBUG=False')
+
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
 
 
 # Application definition
@@ -157,11 +162,22 @@ OLLAMA_NUM_CTX = int(os.environ.get('OLLAMA_NUM_CTX', '2048'))
 # Chatbot API protection
 CHATBOT_RATE_LIMIT_REQUESTS = int(os.environ.get('CHATBOT_RATE_LIMIT_REQUESTS', '20'))
 CHATBOT_RATE_LIMIT_WINDOW = int(os.environ.get('CHATBOT_RATE_LIMIT_WINDOW', '60'))
+REGISTER_RATE_LIMIT_REQUESTS = int(os.environ.get('REGISTER_RATE_LIMIT_REQUESTS', '5'))
+REGISTER_RATE_LIMIT_WINDOW = int(os.environ.get('REGISTER_RATE_LIMIT_WINDOW', '300'))
+COUPON_RATE_LIMIT_REQUESTS = int(os.environ.get('COUPON_RATE_LIMIT_REQUESTS', '10'))
+COUPON_RATE_LIMIT_WINDOW = int(os.environ.get('COUPON_RATE_LIMIT_WINDOW', '60'))
+CHECKOUT_RATE_LIMIT_REQUESTS = int(os.environ.get('CHECKOUT_RATE_LIMIT_REQUESTS', '5'))
+CHECKOUT_RATE_LIMIT_WINDOW = int(os.environ.get('CHECKOUT_RATE_LIMIT_WINDOW', '300'))
 
 # Browser and deployment security
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False') == 'True'
 SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'False') == 'True'
 CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'False') == 'True'
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False
 SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))

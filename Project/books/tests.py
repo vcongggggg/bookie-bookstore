@@ -265,7 +265,7 @@ class BasicFlowTest(TestCase):
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
 
-        response = self.client.get(
+        response = self.client.post(
             reverse("remove_from_cart", args=[f"{self.book.id}_physical"]),
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
@@ -377,6 +377,70 @@ class BasicFlowTest(TestCase):
         self.assertIsNone(order.coupon)
         self.assertEqual(float(order.discount_amount), 0.0)
         self.assertEqual(float(order.total), 100.0)
+
+    def test_checkout_revalidates_locked_stock_before_creating_order(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["cart"] = {f"{self.book.id}_physical": 2}
+        session.save()
+        self.book.stock = 1
+        self.book.save(update_fields=["stock"])
+
+        response = self.client.post(
+            reverse("checkout"),
+            data={
+                "shipping_address": "123 Test Street",
+                "note": "",
+                "coupon_code": "",
+                "payment_method": "cod",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("cart"))
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.stock, 1)
+
+    @override_settings(COUPON_RATE_LIMIT_REQUESTS=1, COUPON_RATE_LIMIT_WINDOW=60)
+    def test_coupon_api_is_rate_limited(self):
+        self.client.force_login(self.user)
+        Coupon.objects.create(
+            code="SAVE10",
+            discount_type="percent",
+            discount_value=10,
+            min_order_amount=0,
+            max_uses=5,
+            valid_to=timezone.now() + timedelta(days=1),
+        )
+
+        first = self.client.post(reverse("api_apply_coupon"), data={"code": "SAVE10", "subtotal": "100"})
+        second = self.client.post(reverse("api_apply_coupon"), data={"code": "SAVE10", "subtotal": "100"})
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+        self.assertIn("retry_after", second.json())
+
+    @override_settings(REGISTER_RATE_LIMIT_REQUESTS=1, REGISTER_RATE_LIMIT_WINDOW=60)
+    def test_register_post_is_rate_limited(self):
+        first = self.client.post(
+            reverse("register"),
+            data={"username": "newbie", "password1": "short", "password2": "mismatch"},
+        )
+        second = self.client.post(
+            reverse("register"),
+            data={"username": "newbie2", "password1": "short", "password2": "mismatch"},
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+
+    def test_remove_from_cart_rejects_get_requests(self):
+        self.client.post(reverse("add_to_cart", args=[self.book.id]), data={"quantity": "1"})
+
+        response = self.client.get(reverse("remove_from_cart", args=[f"{self.book.id}_physical"]))
+
+        self.assertEqual(response.status_code, 405)
 
     def test_dashboard_urls_reverse(self):
         names = [
