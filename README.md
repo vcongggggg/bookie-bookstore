@@ -16,6 +16,15 @@ Bookie is a Django bookstore project with a full e-commerce workflow, admin dash
 - Quality baseline: Django checks, automated tests, GitHub Actions workflow, CSRF-protected chatbot API, AJAX cart/wishlist tests, sitemap/robots.txt, and JSON-LD Book SEO.
 - Local and Docker-ready workflows with seed commands and environment templates.
 
+## Security Highlights
+
+- **Brute-Force Protection:** Enforces soft account lockouts (IP and username) after **5 failed login attempts** for 15 minutes.
+- **Race Condition Prevention:** Combines Django database transactions with `select_for_update()` locking to prevent stock and coupon overdrafts.
+- **Shared API Rate Limiting:** Enforces request thresholds on high-traffic or sensitive endpoints (Registration, Coupon Apply, Chatbot, and Checkout).
+- **IDOR Protection:** Implements rigorous checks on profiles, orders, and PDF invoice downloads to verify resource ownership.
+- **CSRF & HTTP Hardening:** Ensures all state-changing endpoints reject GET requests, require CSRF tokens, and secure cookies are configured for TLS.
+- **HTML Sanitization:** Cleans digital book content to prevent XSS.
+
 ## Demo Status
 
 - Live demo: not deployed yet
@@ -144,7 +153,7 @@ python manage.py check
 python manage.py test books
 ```
 
-Current baseline: `47 tests passing`.
+Current baseline: `56 tests passing`.
 
 ## Run with Docker
 

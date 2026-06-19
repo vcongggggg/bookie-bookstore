@@ -8,9 +8,11 @@ on:
       - "hardening/**"
       - "testing/**"
       - "docs/**"
+      - security-hardening
   pull_request:
     branches:
       - main
+      - security-hardening
 
 jobs:
   test:

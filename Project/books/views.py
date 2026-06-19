@@ -17,7 +17,7 @@ from django.contrib.auth import get_user_model, login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import Group
-from django.contrib.auth.views import redirect_to_login
+from django.contrib.auth.views import LoginView, redirect_to_login
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -514,6 +514,80 @@ def book_detail(request, pk: int):
     return render(request, "books/book_detail.html", context)
 
 
+class BookieLoginView(LoginView):
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect(settings.LOGIN_REDIRECT_URL)
+        
+        # Check lockout based on IP
+        ip_actor = _client_actor(request)
+        ip_lockout_key = f"login_lockout:{ip_actor}"
+        if cache.get(ip_lockout_key):
+            from django.contrib.auth.forms import AuthenticationForm
+            form = AuthenticationForm(request)
+            form.cleaned_data = {}
+            form.add_error(None, "Tài khoản hoặc thiết bị của bạn tạm thời bị khóa do đăng nhập sai nhiều lần. Vui lòng thử lại sau 15 phút.")
+            return render(request, self.template_name or "registration/login.html", {"form": form})
+            
+        # Check lockout based on username
+        if request.method == "POST":
+            username = request.POST.get("username", "").strip()
+            if username:
+                user_lockout_key = f"login_lockout:username:{username.lower()}"
+                if cache.get(user_lockout_key):
+                    from django.contrib.auth.forms import AuthenticationForm
+                    form = AuthenticationForm(request, data=request.POST)
+                    form.cleaned_data = {}
+                    form.add_error(None, "Tài khoản hoặc thiết bị của bạn tạm thời bị khóa do đăng nhập sai nhiều lần. Vui lòng thử lại sau 15 phút.")
+                    return render(request, self.template_name or "registration/login.html", {"form": form})
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        request = self.request
+        ip_actor = _client_actor(request)
+        username = request.POST.get("username", "").strip()
+
+        # Increment IP failures
+        ip_fail_key = f"login_failed_count:{ip_actor}"
+        try:
+            ip_fails = int(cache.get(ip_fail_key, 0))
+        except (ValueError, TypeError):
+            ip_fails = 0
+        ip_fails += 1
+        cache.set(ip_fail_key, ip_fails, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
+        if ip_fails >= settings.LOGIN_RATE_LIMIT_FAILED_ATTEMPTS:
+            cache.set(f"login_lockout:{ip_actor}", True, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
+
+        # Increment Username failures
+        if username:
+            user_fail_key = f"login_failed_count:username:{username.lower()}"
+            try:
+                user_fails = int(cache.get(user_fail_key, 0))
+            except (ValueError, TypeError):
+                user_fails = 0
+            user_fails += 1
+            cache.set(user_fail_key, user_fails, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
+            if user_fails >= settings.LOGIN_RATE_LIMIT_FAILED_ATTEMPTS:
+                cache.set(f"login_lockout:username:{username.lower()}", True, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
+
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        # Clear failures on successful login
+        request = self.request
+        ip_actor = _client_actor(request)
+        username = request.POST.get("username", "").strip()
+
+        cache.delete(f"login_failed_count:{ip_actor}")
+        cache.delete(f"login_lockout:{ip_actor}")
+        if username:
+            cache.delete(f"login_failed_count:username:{username.lower()}")
+            cache.delete(f"login_lockout:username:{username.lower()}")
+
+        return super().form_valid(form)
+
+
 def register(request):
     if request.user.is_authenticated:
         return redirect("home")
@@ -841,9 +915,12 @@ def vnpay_return(request):
         order = get_object_or_404(Order, pk=order_id)
         
         if response_code == "00":
-            order.status = "confirmed"
-            order.save(update_fields=["status"])
-            messages.success(request, f"Thanh toán VNPay thành công cho đơn hàng #{order.pk}!")
+            if order.status == "pending":
+                order.status = "confirmed"
+                order.save(update_fields=["status"])
+                messages.success(request, f"Thanh toán VNPay thành công cho đơn hàng #{order.pk}!")
+            else:
+                messages.info(request, f"Đơn hàng #{order.pk} đã được xử lý trước đó.")
         else:
             messages.error(request, f"Thanh toán VNPay thất bại. Mã lỗi: {response_code}")
             

@@ -53,6 +53,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -144,6 +145,21 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise storage to compress and cache static files
+if 'test' in sys.argv:
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+else:
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 # Auth
 LOGIN_REDIRECT_URL = '/'
@@ -168,6 +184,8 @@ COUPON_RATE_LIMIT_REQUESTS = int(os.environ.get('COUPON_RATE_LIMIT_REQUESTS', '1
 COUPON_RATE_LIMIT_WINDOW = int(os.environ.get('COUPON_RATE_LIMIT_WINDOW', '60'))
 CHECKOUT_RATE_LIMIT_REQUESTS = int(os.environ.get('CHECKOUT_RATE_LIMIT_REQUESTS', '5'))
 CHECKOUT_RATE_LIMIT_WINDOW = int(os.environ.get('CHECKOUT_RATE_LIMIT_WINDOW', '300'))
+LOGIN_RATE_LIMIT_FAILED_ATTEMPTS = int(os.environ.get('LOGIN_RATE_LIMIT_FAILED_ATTEMPTS', '5'))
+LOGIN_RATE_LIMIT_LOCKOUT_WINDOW = int(os.environ.get('LOGIN_RATE_LIMIT_LOCKOUT_WINDOW', '900'))
 
 # Browser and deployment security
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False') == 'True'

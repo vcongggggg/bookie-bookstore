@@ -11,6 +11,15 @@
                 <h2 class="fw-bold" style="font-size:1.5rem">Đăng nhập</h2>
                 <p style="color:var(--text-muted);font-size:.9rem">Chào mừng bạn trở lại!</p>
             </div>
+            {% if form.errors or form.non_field_errors %}
+            <div class="alert alert-danger alert-bs mb-3">
+                {% if form.non_field_errors %}
+                    {{ form.non_field_errors.0 }}
+                {% else %}
+                    Tên đăng nhập hoặc mật khẩu không chính xác.
+                {% endif %}
+            </div>
+            {% endif %}
             <form method="post" action="{% url 'login' %}">
                 {% csrf_token %}
                 <div class="mb-3">

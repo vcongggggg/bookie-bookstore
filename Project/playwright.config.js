@@ -19,7 +19,9 @@ module.exports = defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:DEBUG=\'True\'; python manage.py migrate --noinput; python manage.py seed_fake_data --reset-demo; python manage.py runserver 127.0.0.1:8000"',
+    command: process.platform === 'win32'
+      ? 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:DEBUG=\'True\'; python manage.py migrate --noinput; python manage.py seed_fake_data --reset-demo; python manage.py runserver 127.0.0.1:8000"'
+      : 'DEBUG=True python manage.py migrate --noinput && DEBUG=True python manage.py seed_fake_data --reset-demo && DEBUG=True python manage.py runserver 127.0.0.1:8000',
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

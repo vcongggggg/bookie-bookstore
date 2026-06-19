@@ -10,9 +10,11 @@ on:
       - "docs/**"
       - "testing/**"
       - "upgrade/**"
+      - security-hardening
   pull_request:
     branches:
       - main
+      - security-hardening
 
 jobs:
   test:
@@ -42,3 +44,19 @@ jobs:
         env:
           USE_SQLITE_FOR_TESTS: "1"
         run: python manage.py test books
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Project/package-lock.json
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Run Playwright E2E tests
+        run: npm run test:e2e

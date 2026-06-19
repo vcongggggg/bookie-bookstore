@@ -818,3 +818,69 @@ class RBACTest(TestCase):
         self.customer.refresh_from_db()
         self.assertTrue(self.customer.is_staff)
         self.assertTrue(self.customer.groups.filter(name="Manager").exists())
+
+
+class SecurityLockoutAndIDORTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = Client()
+        self.user1 = User.objects.create_user(username="user1", password="password123")
+        self.user2 = User.objects.create_user(username="user2", password="password123")
+        self.category = Category.objects.create(name="IT")
+        self.book = Book.objects.create(
+            title="Secure Python",
+            author="Developer",
+            price=150.0,
+            category=self.category,
+            stock=10
+        )
+        self.order1 = Order.objects.create(user=self.user1, shipping_address="123 Address")
+
+    def test_order_detail_idor_restriction(self):
+        """Verify that user2 cannot view user1's order detail."""
+        self.client.force_login(self.user2)
+        response = self.client.get(reverse("order_detail", args=[self.order1.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_payment_gateway_idor_restriction(self):
+        """Verify that user2 cannot access payment gateway for user1's order."""
+        self.client.force_login(self.user2)
+        response = self.client.get(reverse("payment_gateway", args=[self.order1.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_payment_confirm_idor_restriction(self):
+        """Verify that user2 cannot confirm payment for user1's order."""
+        self.client.force_login(self.user2)
+        response = self.client.get(reverse("payment_confirm", args=[self.order1.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_cancel_order_idor_restriction(self):
+        """Verify that user2 cannot cancel user1's order."""
+        self.client.force_login(self.user2)
+        response = self.client.post(reverse("cancel_order", args=[self.order1.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    @override_settings(LOGIN_RATE_LIMIT_FAILED_ATTEMPTS=3, LOGIN_RATE_LIMIT_LOCKOUT_WINDOW=60)
+    def test_login_lockout_by_ip_and_username(self):
+        """Verify that 3 failed login attempts locks out the user."""
+        # Attempt 1: Failed
+        response = self.client.post(reverse("login"), {"username": "user1", "password": "wrongpassword"})
+        self.assertEqual(response.status_code, 200)
+
+        # Attempt 2: Failed
+        response = self.client.post(reverse("login"), {"username": "user1", "password": "wrongpassword"})
+        self.assertEqual(response.status_code, 200)
+
+        # Attempt 3: Failed (reaches limit)
+        response = self.client.post(reverse("login"), {"username": "user1", "password": "wrongpassword"})
+        self.assertEqual(response.status_code, 200)
+
+        # Attempt 4: Lockout error is shown even with correct password
+        response = self.client.post(reverse("login"), {"username": "user1", "password": "password123"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "tạm thời bị khóa")
+
+        # Clear cache: correct password works
+        cache.clear()
+        response = self.client.post(reverse("login"), {"username": "user1", "password": "password123"})
+        self.assertEqual(response.status_code, 302)
