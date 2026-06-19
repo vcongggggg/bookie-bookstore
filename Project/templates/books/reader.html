@@ -4,10 +4,17 @@
 {% block main_class %}reader-main{% endblock %}
 
 {% block extra_css %}
+<!-- Import Premium Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+
 <style>
     body.reader-mode {
         background: #f4efe6;
         overflow-x: hidden;
+        margin: 0;
+        padding: 0;
     }
     body.reader-mode .navbar-bs,
     body.reader-mode .footer-bs {
@@ -23,96 +30,170 @@
     .reader-shell {
         min-height: 100vh;
         background:
-            linear-gradient(90deg, rgba(45,42,38,.05), transparent 14%, transparent 86%, rgba(45,42,38,.05)),
-            var(--reader-page-bg, #f4efe6);
-        color: var(--reader-text, #24211d);
-        transition: background .2s ease, color .2s ease;
+            linear-gradient(90deg, rgba(45,42,38,.03), transparent 15%, transparent 85%, rgba(45,42,38,.03)),
+            var(--reader-page-bg, #FAF9F6);
+        color: var(--reader-text, #1C1A17);
+        transition: background .3s ease, color .3s ease;
     }
+    
+    /* Premium Palette Variables */
     .reader-shell[data-reader-theme="light"] {
-        --reader-page-bg: #f7f2ea;
-        --reader-surface: #fffaf2;
-        --reader-text: #24211d;
-        --reader-muted: #7a7065;
-        --reader-border: #ded4c6;
-        --reader-control: rgba(255,255,255,.82);
+        --reader-page-bg: #FAFBF9;
+        --reader-surface: #FFFFFF;
+        --reader-text: #1C1A17;
+        --reader-muted: #7E786E;
+        --reader-border: #E8E3D9;
+        --reader-control: rgba(255, 255, 255, 0.72);
+        --reader-control-rgb: 255, 255, 255;
     }
     .reader-shell[data-reader-theme="sepia"] {
-        --reader-page-bg: #eadbc2;
-        --reader-surface: #fbefd7;
-        --reader-text: #2f2418;
-        --reader-muted: #7d6549;
-        --reader-border: #d2bd9b;
-        --reader-control: rgba(255,247,232,.86);
+        --reader-page-bg: #F5EEDB;
+        --reader-surface: #FAF3E6;
+        --reader-text: #2D2318;
+        --reader-muted: #826E59;
+        --reader-border: #E6D8C1;
+        --reader-control: rgba(250, 243, 230, 0.76);
+        --reader-control-rgb: 250, 243, 230;
+    }
+    .reader-shell[data-reader-theme="mint"] {
+        --reader-page-bg: #EAEFE9;
+        --reader-surface: #F2F6F1;
+        --reader-text: #1F2821;
+        --reader-muted: #6B7C70;
+        --reader-border: #D8E2D5;
+        --reader-control: rgba(242, 246, 241, 0.76);
+        --reader-control-rgb: 242, 246, 241;
+    }
+    .reader-shell[data-reader-theme="slate"] {
+        --reader-page-bg: #1B202A;
+        --reader-surface: #242936;
+        --reader-text: #E3E9F2;
+        --reader-muted: #8F9EB3;
+        --reader-border: #2D3546;
+        --reader-control: rgba(36, 41, 54, 0.76);
+        --reader-control-rgb: 36, 41, 54;
     }
     .reader-shell[data-reader-theme="dark"] {
-        --reader-page-bg: #151515;
-        --reader-surface: #202020;
-        --reader-text: #e8e1d5;
-        --reader-muted: #aaa195;
-        --reader-border: #3a342d;
-        --reader-control: rgba(32,32,32,.9);
+        --reader-page-bg: #0A0A0A;
+        --reader-surface: #141414;
+        --reader-text: #D5D5D5;
+        --reader-muted: #808080;
+        --reader-border: #242424;
+        --reader-control: rgba(20, 20, 20, 0.76);
+        --reader-control-rgb: 20, 20, 20;
     }
+
+    /* Floating Glassmorphism Header */
     .reader-topbar {
-        position: sticky;
-        top: 0;
+        position: fixed;
+        top: 1.25rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(1200px, calc(100vw - 2.5rem));
         z-index: 1040;
-        min-height: 68px;
-        background: var(--reader-control);
-        backdrop-filter: blur(18px);
-        border-bottom: 1px solid var(--reader-border);
+        height: 72px;
+        background: rgba(var(--reader-control-rgb), 0.75);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--reader-border);
+        border-radius: 20px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 1rem;
-        padding: .75rem clamp(1rem, 3vw, 2rem);
+        padding: 0 1.5rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+    }
+    .reader-topbar.hidden {
+        transform: translate(-50%, -100px);
+        opacity: 0;
+        pointer-events: none;
     }
     .reader-title-wrap {
         min-width: 0;
         display: flex;
         align-items: center;
-        gap: .85rem;
+        gap: 1rem;
     }
-    .reader-back,
-    .reader-icon-btn {
-        width: 40px;
-        height: 40px;
+    .reader-back {
+        width: 44px;
+        height: 44px;
         border-radius: 50%;
         border: 1px solid var(--reader-border);
-        background: var(--reader-control);
+        background: var(--reader-surface);
         color: var(--reader-text);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         text-decoration: none;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .reader-back:hover,
-    .reader-icon-btn:hover {
-        color: var(--accent);
-        border-color: rgba(192,86,33,.45);
+    .reader-back:hover {
+        transform: scale(1.05);
+        border-color: var(--primary);
+        color: var(--primary);
     }
     .reader-book-title {
-        font-weight: 800;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 1.1rem;
         line-height: 1.2;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: min(46vw, 520px);
+        max-width: min(35vw, 420px);
     }
     .reader-book-author {
         color: var(--reader-muted);
-        font-size: .84rem;
+        font-size: .8rem;
+        font-weight: 500;
     }
     .reader-actions {
         display: flex;
         align-items: center;
-        gap: .5rem;
-        flex-wrap: wrap;
-        justify-content: flex-end;
+        gap: .65rem;
     }
+    .reader-icon-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 1px solid var(--reader-border);
+        background: var(--reader-surface);
+        color: var(--reader-text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .reader-icon-btn:hover {
+        transform: scale(1.05);
+        color: var(--primary);
+        border-color: var(--primary);
+        box-shadow: 0 4px 12px rgba(var(--reader-control-rgb), 0.15);
+    }
+    .reader-icon-btn.active {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+    }
+    .meta-chip {
+        font-size: .8rem;
+        font-weight: 600;
+        padding: .45rem .85rem;
+        background: rgba(192,86,33,.12);
+        color: var(--primary);
+        border-radius: 99px;
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+    }
+
+    /* Layout & Page Container */
     .reader-layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
-        padding: clamp(1rem, 3vw, 2.5rem) 1rem 7rem;
+        padding: 9rem 1rem 8rem;
     }
     .reader-page {
         width: min(var(--reader-width, 760px), calc(100vw - 2rem));
@@ -120,9 +201,9 @@
         margin: 0 auto;
         background: var(--reader-surface);
         border: 1px solid var(--reader-border);
-        box-shadow: 0 24px 80px rgba(45,42,38,.16);
-        padding: clamp(1.35rem, 4vw, 4rem);
-        border-radius: 8px;
+        box-shadow: 0 24px 80px rgba(45,42,38,.08);
+        padding: clamp(2rem, 5vw, 4.5rem);
+        border-radius: 16px;
         position: relative;
     }
     .reader-page::before {
@@ -131,130 +212,156 @@
         inset: 0;
         pointer-events: none;
         border-radius: inherit;
-        box-shadow: inset 20px 0 32px rgba(45,42,38,.035), inset -20px 0 32px rgba(45,42,38,.03);
+        box-shadow: inset 18px 0 24px rgba(45,42,38,.015), inset -18px 0 24px rgba(45,42,38,.01);
+    }
+    .reader-page-kicker {
+        color: var(--reader-muted);
+        font-size: .8rem;
+        text-transform: uppercase;
+        letter-spacing: .12em;
+        margin-bottom: 1.75rem;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        border-bottom: 1px solid var(--reader-border);
+        padding-bottom: 0.5rem;
     }
     .reader-page-content {
-        font-family: Georgia, "Times New Roman", serif;
-        font-size: var(--reader-font-size, 20px);
-        line-height: var(--reader-line-height, 1.78);
         color: var(--reader-text);
+        font-family: var(--reader-font-family, 'Merriweather', Georgia, serif);
+        font-size: var(--reader-font-size, 20px);
+        line-height: var(--reader-line-height, 1.8);
+        text-align: justify;
+        transition: opacity 0.22s ease-in-out;
+        opacity: 1;
+    }
+    .reader-page-content.fade-out {
+        opacity: 0;
     }
     .reader-page-content p {
-        margin: 0 0 1.05em;
-        text-align: justify;
+        margin: 0 0 1.25em;
+        text-indent: 1.5em;
     }
-    .reader-page-content p:last-child {
-        margin-bottom: 0;
+    .reader-page-content p:first-of-type {
+        text-indent: 0;
     }
     .reader-page-content img {
         display: block;
         max-width: 100%;
         height: auto;
-        margin: 1.25rem auto;
-        border-radius: 8px;
-        box-shadow: 0 14px 38px rgba(45,42,38,.14);
-    }
-    .reader-page-content figure {
-        margin: 1.5rem 0;
-    }
-    .reader-page-content figcaption {
-        color: var(--reader-muted);
-        font-family: Manrope, system-ui, sans-serif;
-        font-size: .9rem;
-        text-align: center;
-        margin-top: .65rem;
+        margin: 2rem auto;
+        border-radius: 12px;
+        box-shadow: 0 16px 40px rgba(0,0,0,0.12);
     }
     .reader-page-content h1,
     .reader-page-content h2,
-    .reader-page-content h3,
-    .reader-page-content h4 {
-        margin: 0 0 1rem;
-        line-height: 1.2;
+    .reader-page-content h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        margin: 2rem 0 1rem;
+        line-height: 1.3;
     }
-    .reader-page-kicker {
-        color: var(--reader-muted);
-        font-size: .78rem;
-        text-transform: uppercase;
-        letter-spacing: .12em;
-        margin-bottom: 1.25rem;
-        font-family: Manrope, system-ui, sans-serif;
-    }
+
+    /* Floating Glassmorphism Footer */
     .reader-bottom {
         position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        bottom: 1.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(900px, calc(100vw - 2.5rem));
         z-index: 1030;
-        background: linear-gradient(to top, var(--reader-page-bg) 76%, transparent);
-        padding: 1.25rem 1rem 1rem;
+        background: rgba(var(--reader-control-rgb), 0.75);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--reader-border);
+        border-radius: 24px;
+        padding: 1rem 1.75rem;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+    }
+    .reader-bottom.hidden {
+        transform: translate(-50%, 100px);
+        opacity: 0;
+        pointer-events: none;
     }
     .reader-bottom-inner {
-        width: min(900px, calc(100vw - 2rem));
-        margin: 0 auto;
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .progress-bar-wrap {
+        display: flex;
         align-items: center;
         gap: 1rem;
     }
     .reader-progress {
+        flex: 1;
         height: 6px;
-        border-radius: 999px;
-        background: rgba(122,112,101,.22);
+        border-radius: 99px;
+        background: rgba(var(--reader-text-rgb, 122,112,101), 0.18);
         overflow: hidden;
+        cursor: pointer;
     }
     .reader-progress-fill {
         height: 100%;
         width: 0;
         border-radius: inherit;
         background: var(--gradient-2);
-        transition: width .25s ease;
+        transition: width .25s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .reader-page-num {
-        color: var(--reader-muted);
-        font-size: .9rem;
-        text-align: right;
-        white-space: nowrap;
-    }
-    .reader-nav {
+    .reader-nav-row {
         display: flex;
         align-items: center;
-        gap: .75rem;
+        justify-content: space-between;
+        gap: 1rem;
     }
     .reader-nav-btn {
         border: 1px solid var(--reader-border);
-        background: var(--reader-control);
+        background: var(--reader-surface);
         color: var(--reader-text);
-        min-width: 116px;
-        height: 44px;
-        border-radius: 999px;
-        font-weight: 800;
+        min-width: 120px;
+        height: 42px;
+        border-radius: 99px;
+        font-weight: 700;
+        font-family: 'Outfit', sans-serif;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: .45rem;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .reader-nav-btn:hover:not(:disabled) {
+        background: var(--primary);
         color: #fff;
-        background: var(--gradient-2);
-        border-color: transparent;
+        border-color: var(--primary);
+        box-shadow: 0 4px 12px rgba(192,86,33,.24);
     }
     .reader-nav-btn:disabled {
-        opacity: .45;
+        opacity: .4;
         cursor: not-allowed;
     }
+    .reader-page-num {
+        color: var(--reader-muted);
+        font-size: .88rem;
+        font-weight: 600;
+        font-family: 'Outfit', sans-serif;
+        white-space: nowrap;
+    }
+    
+    /* Config Panel */
     .reader-panel {
         position: fixed;
         top: 0;
         right: 0;
         z-index: 1055;
-        width: min(380px, 92vw);
+        width: min(390px, 92vw);
         height: 100vh;
         background: var(--reader-surface);
         color: var(--reader-text);
         border-left: 1px solid var(--reader-border);
-        box-shadow: -22px 0 60px rgba(0,0,0,.2);
+        box-shadow: -22px 0 60px rgba(0,0,0,.15);
         transform: translateX(105%);
-        transition: transform .24s ease;
+        transition: transform .28s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
     }
@@ -262,25 +369,39 @@
         transform: translateX(0);
     }
     .reader-panel-header {
-        padding: 1rem;
+        padding: 1.25rem 1.5rem;
         border-bottom: 1px solid var(--reader-border);
         display: flex;
         align-items: center;
         justify-content: space-between;
     }
     .reader-panel-body {
-        padding: 1rem;
-        overflow: auto;
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .reader-panel-body::-webkit-scrollbar {
+        width: 6px;
+    }
+    .reader-panel-body::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .reader-panel-body::-webkit-scrollbar-thumb {
+        background: var(--reader-border);
+        border-radius: 99px;
     }
     .reader-setting {
-        margin-bottom: 1.25rem;
+        margin-bottom: 1.75rem;
     }
     .reader-setting label {
         display: block;
-        font-size: .82rem;
+        font-size: .85rem;
         color: var(--reader-muted);
-        font-weight: 800;
-        margin-bottom: .45rem;
+        font-weight: 700;
+        font-family: 'Outfit', sans-serif;
+        margin-bottom: .6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
     .reader-theme-options {
         display: grid;
@@ -289,78 +410,139 @@
     }
     .reader-theme-btn {
         border: 1px solid var(--reader-border);
-        border-radius: 8px;
-        background: transparent;
-        color: var(--reader-text);
-        padding: .65rem .5rem;
+        border-radius: 10px;
+        background: var(--theme-btn-bg, #fff);
+        color: var(--theme-btn-text, #000);
+        padding: .75rem .5rem;
         font-size: .85rem;
-        font-weight: 800;
+        font-weight: 600;
+        font-family: 'Outfit', sans-serif;
+        cursor: pointer;
+        transition: all 0.25s ease;
     }
+    .reader-theme-btn[data-theme-choice="light"] { --theme-btn-bg: #FAFBF9; --theme-btn-text: #1C1A17; }
+    .reader-theme-btn[data-theme-choice="sepia"] { --theme-btn-bg: #F5EEDB; --theme-btn-text: #2D2318; }
+    .reader-theme-btn[data-theme-choice="mint"] { --theme-btn-bg: #EAEFE9; --theme-btn-text: #1F2821; }
+    .reader-theme-btn[data-theme-choice="slate"] { --theme-btn-bg: #1B202A; --theme-btn-text: #E3E9F2; }
+    .reader-theme-btn[data-theme-choice="dark"] { --theme-btn-bg: #0A0A0A; --theme-btn-text: #D5D5D5; }
     .reader-theme-btn.active {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(192,86,33,.14);
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(192,86,33,.2);
     }
+    
+    .reader-font-options {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: .5rem;
+    }
+    .reader-font-btn {
+        border: 1px solid var(--reader-border);
+        border-radius: 10px;
+        background: var(--reader-surface);
+        color: var(--reader-text);
+        padding: .75rem .25rem;
+        font-size: .8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .reader-font-btn.active {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(192,86,33,.2);
+        color: var(--primary);
+    }
+    
     .page-jump-controls {
         display: grid;
         grid-template-columns: 1fr auto;
         gap: .5rem;
         align-items: center;
-        margin-bottom: .75rem;
+        margin-bottom: 1rem;
     }
     .page-jump-controls .form-control {
-        background: var(--reader-control);
-        border-color: var(--reader-border);
-        color: var(--reader-text);
-    }
-    .page-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .45rem;
-    }
-    .page-jump {
+        background: var(--reader-surface);
         border: 1px solid var(--reader-border);
-        background: var(--reader-control);
         color: var(--reader-text);
-        border-radius: 8px;
-        height: 38px;
-        min-width: 46px;
-        padding: 0 .65rem;
-        font-weight: 800;
+        border-radius: 10px;
+        height: 42px;
     }
-    .page-jump.active {
+    .page-jump-btn {
+        height: 42px;
+        padding: 0 1.25rem;
+        border-radius: 10px;
+        background: var(--primary);
+        border: none;
         color: #fff;
-        background: var(--gradient-2);
-        border-color: transparent;
+        font-weight: 700;
+        font-family: 'Outfit', sans-serif;
+        cursor: pointer;
     }
-    @media (max-width: 720px) {
+    .bookmark-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    .bookmark-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.65rem 0.85rem;
+        background: rgba(var(--reader-text-rgb, 122,112,101), 0.05);
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .bookmark-jump-btn {
+        color: var(--primary);
+        background: transparent;
+        border: none;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .bookmark-delete-btn {
+        color: var(--reader-muted);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+    }
+    .bookmark-delete-btn:hover {
+        color: #dc3545;
+    }
+
+    /* Responsiveness adjustments */
+    @media (max-width: 768px) {
         .reader-topbar {
-            align-items: flex-start;
+            top: 0.75rem;
+            width: calc(100vw - 1.5rem);
+            height: 64px;
+            padding: 0 1rem;
         }
         .reader-book-title {
-            max-width: 52vw;
+            max-width: 40vw;
+            font-size: 1rem;
         }
-        .reader-actions {
-            gap: .35rem;
+        .reader-bottom {
+            bottom: 0.75rem;
+            width: calc(100vw - 1.5rem);
+            padding: 0.75rem 1rem;
+            border-radius: 16px;
+        }
+        .reader-layout {
+            padding: 7.5rem 0.5rem 7.5rem;
         }
         .reader-page {
-            min-height: 70vh;
-            width: calc(100vw - 1rem);
-            border-radius: 0;
-            padding: 1.25rem;
+            width: 100%;
+            border-radius: 12px;
+            padding: 1.5rem 1.25rem;
+            min-height: 60vh;
         }
-        .reader-bottom-inner {
-            grid-template-columns: 1fr;
-            gap: .75rem;
-        }
-        .reader-page-num {
-            text-align: center;
-        }
-        .reader-nav {
-            justify-content: center;
-            order: -1;
+        .reader-page-content {
+            font-size: 18px;
         }
         .reader-nav-btn {
-            min-width: 104px;
+            min-width: 96px;
+            height: 38px;
         }
     }
 </style>
@@ -368,10 +550,11 @@
 
 {% block content %}
 <div class="reader-shell" id="readerShell" data-reader-theme="sepia">
-    <header class="reader-topbar">
+    <!-- Floating Glass Header -->
+    <header class="reader-topbar" id="readerTopbar">
         <div class="reader-title-wrap">
             <a href="{% url 'book_detail' book.pk %}" class="reader-back" title="Quay lại chi tiết sách">
-                <i class="bi bi-arrow-left"></i>
+                <i class="bi bi-arrow-left" style="font-size: 1.15rem;"></i>
             </a>
             <div class="min-w-0">
                 <div class="reader-book-title">{{ book.title }}</div>
@@ -379,13 +562,16 @@
             </div>
         </div>
         <div class="reader-actions">
-            <span class="meta-chip"><i class="bi bi-unlock"></i>Đọc online miễn phí</span>
-            <button class="reader-icon-btn" id="decreaseFontBtn" title="Giảm cỡ chữ"><i class="bi bi-dash-lg"></i></button>
-            <button class="reader-icon-btn" id="increaseFontBtn" title="Tăng cỡ chữ"><i class="bi bi-plus-lg"></i></button>
-            <button class="reader-icon-btn" id="togglePanelBtn" title="Tùy chỉnh và danh sách trang"><i class="bi bi-sliders"></i></button>
+            <!-- Fullscreen trigger -->
+            <button class="reader-icon-btn" id="fullscreenBtn" title="Phóng to toàn màn hình"><i class="bi bi-fullscreen"></i></button>
+            <!-- Bookmark trigger -->
+            <button class="reader-icon-btn" id="bookmarkBtn" title="Đánh dấu trang này"><i class="bi bi-bookmark"></i></button>
+            
+            <button class="reader-icon-btn" id="togglePanelBtn" title="Tùy chỉnh đọc"><i class="bi bi-sliders"></i></button>
         </div>
     </header>
 
+    <!-- Page Content Area -->
     <section class="reader-layout">
         <article class="reader-page" aria-live="polite">
             <div class="reader-page-kicker" id="readerKicker">Trang 1</div>
@@ -393,49 +579,85 @@
         </article>
     </section>
 
-    <footer class="reader-bottom">
+    <!-- Floating Glass Footer -->
+    <footer class="reader-bottom" id="readerBottom">
         <div class="reader-bottom-inner">
-            <div class="reader-progress" aria-hidden="true">
-                <div class="reader-progress-fill" id="progressBar"></div>
+            <div class="progress-bar-wrap">
+                <div class="reader-progress" id="progressTrack" aria-hidden="true" title="Bấm để cuộn nhanh">
+                    <div class="reader-progress-fill" id="progressBar"></div>
+                </div>
             </div>
-            <div class="reader-nav">
+            <div class="reader-nav-row">
                 <button class="reader-nav-btn" id="prevBtn"><i class="bi bi-chevron-left"></i>Trước</button>
+                <div class="reader-page-num text-center" id="pageIndicator">Trang 1 / 1 · Còn ~1 phút đọc</div>
                 <button class="reader-nav-btn" id="nextBtn">Tiếp<i class="bi bi-chevron-right"></i></button>
             </div>
-            <div class="reader-page-num" id="pageIndicator">Trang 1 / 1</div>
         </div>
     </footer>
 
+    <!-- Side Configurations Panel -->
     <aside class="reader-panel" id="readerPanel" aria-label="Tùy chỉnh đọc sách">
         <div class="reader-panel-header">
-            <strong><i class="bi bi-sliders me-2"></i>Tùy chỉnh đọc</strong>
+            <strong style="font-family: 'Outfit', sans-serif; font-size: 1.1rem;"><i class="bi bi-sliders me-2 text-primary"></i>TÙY CHỈNH ĐỌC</strong>
             <button class="reader-icon-btn" id="closePanelBtn" title="Đóng"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="reader-panel-body">
+            <!-- Theme selection -->
             <div class="reader-setting">
-                <label>Giao diện</label>
+                <label>Chủ đề màu sắc</label>
                 <div class="reader-theme-options">
                     <button class="reader-theme-btn" data-theme-choice="light">Sáng</button>
                     <button class="reader-theme-btn" data-theme-choice="sepia">Sepia</button>
+                    <button class="reader-theme-btn" data-theme-choice="mint">Bạc hà</button>
+                    <button class="reader-theme-btn" data-theme-choice="slate">Slate</button>
                     <button class="reader-theme-btn" data-theme-choice="dark">Tối</button>
                 </div>
             </div>
+            
+            <!-- Font family selection -->
             <div class="reader-setting">
-                <label for="fontSizeRange">Cỡ chữ</label>
+                <label>Phông chữ</label>
+                <div class="reader-font-options">
+                    <button class="reader-font-btn" data-font-choice="merriweather" style="font-family: 'Merriweather', serif;">Merriweather</button>
+                    <button class="reader-font-btn" data-font-choice="lora" style="font-family: 'Lora', serif;">Lora</button>
+                    <button class="reader-font-btn" data-font-choice="inter" style="font-family: 'Inter', sans-serif;">Inter UI</button>
+                </div>
+            </div>
+
+            <!-- Font size range -->
+            <div class="reader-setting">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="m-0">Cỡ chữ</label>
+                    <span id="fontSizeDisplay" class="fw-bold text-primary" style="font-size: 0.9rem;">20px</span>
+                </div>
                 <input type="range" class="form-range" min="16" max="30" value="20" id="fontSizeRange">
             </div>
+
+            <!-- Width range -->
             <div class="reader-setting">
-                <label for="widthRange">Độ rộng trang</label>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="m-0">Độ rộng trang</label>
+                    <span id="widthDisplay" class="fw-bold text-primary" style="font-size: 0.9rem;">760px</span>
+                </div>
                 <input type="range" class="form-range" min="620" max="980" step="20" value="760" id="widthRange">
             </div>
+
+            <!-- Jump page and slider -->
             <div class="reader-setting">
-                <label>Chuyển nhanh</label>
+                <label>Chuyển đến trang</label>
                 <div class="page-jump-controls">
                     <input type="number" class="form-control" id="pageNumberInput" min="1" max="{{ total_pages }}" value="{{ current_page }}">
-                    <button type="button" class="reader-theme-btn" id="jumpPageBtn">Đi</button>
+                    <button type="button" class="page-jump-btn" id="jumpPageBtn">Đi</button>
                 </div>
                 <input type="range" class="form-range" min="1" max="{{ total_pages }}" value="{{ current_page }}" id="pageRange">
-                <div class="page-list" id="pageList"></div>
+            </div>
+            
+            <!-- Bookmarks Section -->
+            <div class="reader-setting">
+                <label>Bookmarks của bạn</label>
+                <div class="bookmark-list" id="bookmarkList">
+                    <div class="text-muted text-center py-2" style="font-size: 0.85rem;">Chưa có bookmark nào</div>
+                </div>
             </div>
         </div>
     </aside>
@@ -449,29 +671,47 @@
     const readerContentFormat = "{{ reader_content_format|escapejs }}";
     const bookId = {{ book.pk }};
 
-    let displayPages = pages.slice();
-
     const shell = document.getElementById("readerShell");
     const contentEl = document.getElementById("pageContent");
     const kickerEl = document.getElementById("readerKicker");
     const pageIndicator = document.getElementById("pageIndicator");
     const progressBar = document.getElementById("progressBar");
+    const progressTrack = document.getElementById("progressTrack");
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     const panel = document.getElementById("readerPanel");
-    const pageList = document.getElementById("pageList");
+    
+    // Topbar / Bottombar control elements
+    const topbar = document.getElementById("readerTopbar");
+    const bottombar = document.getElementById("readerBottom");
+    
+    // Bookmark and Fullscreen elements
+    const bookmarkBtn = document.getElementById("bookmarkBtn");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const bookmarkListEl = document.getElementById("bookmarkList");
+    
     const pageNumberInput = document.getElementById("pageNumberInput");
     const pageRange = document.getElementById("pageRange");
+    
+    // Ranges & values displays
     const fontSizeRange = document.getElementById("fontSizeRange");
+    const fontSizeDisplay = document.getElementById("fontSizeDisplay");
     const widthRange = document.getElementById("widthRange");
+    const widthDisplay = document.getElementById("widthDisplay");
+    
     const settingKey = `bookie_reader_settings_${bookId}`;
     const progressKey = `bookie_reader_page_${bookId}`;
-    const totalPages = displayPages.length;
-    const readableTotal = totalPages;
+    const bookmarkKey = `bookie_reader_bookmarks_${bookId}`;
+    const totalPages = pages.length;
+    
     let currentPage = Number(localStorage.getItem(progressKey)) || {{ current_page }};
     currentPage = Math.min(Math.max(1, currentPage), totalPages);
     pageNumberInput.max = totalPages;
     pageRange.max = totalPages;
+
+    // Immersive HUD auto-hide control
+    let barTimeout = null;
+    let areBarsVisible = true;
 
     function getSettings() {
         try {
@@ -489,19 +729,37 @@
         const theme = settings.theme || "sepia";
         const fontSize = Number(settings.fontSize || 20);
         const width = Number(settings.width || 760);
+        const fontChoice = settings.fontChoice || "merriweather";
+        
         shell.dataset.readerTheme = theme;
         shell.style.setProperty("--reader-font-size", `${fontSize}px`);
         shell.style.setProperty("--reader-width", `${width}px`);
+        
         fontSizeRange.value = fontSize;
+        fontSizeDisplay.textContent = `${fontSize}px`;
         widthRange.value = width;
+        widthDisplay.textContent = `${width}px`;
+
+        // Update font class
+        contentEl.style.setProperty("--reader-font-family", 
+            fontChoice === "inter" ? "'Inter', sans-serif" : 
+            fontChoice === "lora" ? "'Lora', serif" : "'Merriweather', serif"
+        );
+
+        // Update theme button state
         document.querySelectorAll(".reader-theme-btn").forEach((btn) => {
             btn.classList.toggle("active", btn.dataset.themeChoice === theme);
+        });
+
+        // Update font button state
+        document.querySelectorAll(".reader-font-btn").forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.fontChoice === fontChoice);
         });
     }
 
     function renderTextPage(text) {
         contentEl.innerHTML = "";
-        text.split(/\n\s*\n/).filter(Boolean).forEach((paragraph) => {
+        text.split(/\n\s*\n/).filter(Boolean).forEach((paragraph, idx) => {
             const p = document.createElement("p");
             p.textContent = paragraph.trim();
             contentEl.appendChild(p);
@@ -522,60 +780,178 @@
                 "X-CSRFToken": getCookie("csrftoken")
             },
             body: JSON.stringify({
-                page: Math.min(currentPage, readableTotal),
+                page: currentPage,
                 finished: currentPage === totalPages
             })
         }).catch(() => {});
     }
 
-    function nearbyPageNumbers() {
-        const pages = new Set([1, totalPages, currentPage]);
-        for (let i = currentPage - 2; i <= currentPage + 2; i++) {
-            if (i >= 1 && i <= totalPages) pages.add(i);
-        }
-        return Array.from(pages).sort((a, b) => a - b);
+    // Estimate remaining reading time
+    function getRemainingTimeText() {
+        const remainingPages = totalPages - currentPage;
+        if (remainingPages <= 0) return "Đã hoàn thành";
+        
+        // Approximate 1.5 minutes per page on average
+        const estMinutes = Math.max(1, Math.round(remainingPages * 1.5));
+        return `Còn ~${estMinutes} phút đọc`;
     }
 
-    function updatePageList() {
-        pageList.innerHTML = "";
-        nearbyPageNumbers().forEach((pageNum, index, arr) => {
-            if (index > 0 && pageNum - arr[index - 1] > 1) {
-                const gap = document.createElement("span");
-                gap.className = "d-inline-flex align-items-center px-1";
-                gap.textContent = "...";
-                pageList.appendChild(gap);
-            }
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "page-jump";
-            btn.classList.toggle("active", pageNum === currentPage);
-            btn.textContent = pageNum;
-            btn.addEventListener("click", () => {
-                goToPage(pageNum);
+    // Bookmark management
+    function getBookmarks() {
+        try {
+            return JSON.parse(localStorage.getItem(bookmarkKey)) || [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveBookmarks(bookmarks) {
+        localStorage.setItem(bookmarkKey, JSON.stringify(bookmarks));
+    }
+
+    function updateBookmarkButtonState() {
+        const bookmarks = getBookmarks();
+        const isBookmarked = bookmarks.includes(currentPage);
+        if (isBookmarked) {
+            bookmarkBtn.classList.add("active");
+            bookmarkBtn.innerHTML = '<i class="bi bi-bookmark-fill"></i>';
+            bookmarkBtn.title = "Bỏ đánh dấu trang này";
+        } else {
+            bookmarkBtn.classList.remove("active");
+            bookmarkBtn.innerHTML = '<i class="bi bi-bookmark"></i>';
+            bookmarkBtn.title = "Đánh dấu trang này";
+        }
+    }
+
+    function renderBookmarkList() {
+        const bookmarks = getBookmarks().sort((a, b) => a - b);
+        if (bookmarks.length === 0) {
+            bookmarkListEl.innerHTML = '<div class="text-muted text-center py-2" style="font-size: 0.85rem;">Chưa có bookmark nào</div>';
+            return;
+        }
+
+        bookmarkListEl.innerHTML = "";
+        bookmarks.forEach(page => {
+            const item = document.createElement("div");
+            item.className = "bookmark-item";
+            
+            const textSpan = document.createElement("span");
+            textSpan.textContent = `Trang ${page}`;
+            item.appendChild(textSpan);
+
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "d-flex gap-2";
+
+            const jumpBtn = document.createElement("button");
+            jumpBtn.className = "bookmark-jump-btn";
+            jumpBtn.textContent = "Xem";
+            jumpBtn.addEventListener("click", () => {
+                goToPage(page);
                 panel.classList.remove("show");
             });
-            pageList.appendChild(btn);
+            actionsDiv.appendChild(jumpBtn);
+
+            const delBtn = document.createElement("button");
+            delBtn.className = "bookmark-delete-btn";
+            delBtn.innerHTML = '<i class="bi bi-trash"></i>';
+            delBtn.addEventListener("click", () => {
+                toggleBookmark(page);
+            });
+            actionsDiv.appendChild(delBtn);
+
+            item.appendChild(actionsDiv);
+            bookmarkListEl.appendChild(item);
         });
-        pageNumberInput.value = currentPage;
-        pageRange.value = currentPage;
     }
 
-    function updateUI() {
-        const page = displayPages[currentPage - 1] || "";
-        kickerEl.textContent = `Trang ${currentPage}`;
-        if (readerContentFormat === "html") {
-            renderHtmlPage(page);
+    function toggleBookmark(page = currentPage) {
+        let bookmarks = getBookmarks();
+        if (bookmarks.includes(page)) {
+            bookmarks = bookmarks.filter(p => p !== page);
         } else {
-            renderTextPage(page);
+            bookmarks.push(page);
         }
+        saveBookmarks(bookmarks);
+        updateBookmarkButtonState();
+        renderBookmarkList();
+    }
+
+    // Toggle fullscreen mode
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen()
+                .then(() => {
+                    fullscreenBtn.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
+                    fullscreenBtn.title = "Thoát toàn màn hình";
+                })
+                .catch(err => {
+                    console.error(`Error enabling fullscreen: ${err.message}`);
+                });
+        } else {
+            document.exitFullscreen();
+            fullscreenBtn.innerHTML = '<i class="bi bi-fullscreen"></i>';
+            fullscreenBtn.title = "Phóng to toàn màn hình";
+        }
+    }
+
+    // HUD Auto-hide logics (Immersive mode)
+    function showBars() {
+        if (!areBarsVisible) {
+            topbar.classList.remove("hidden");
+            bottombar.classList.remove("hidden");
+            areBarsVisible = true;
+        }
+        resetBarTimer();
+    }
+
+    function hideBars() {
+        // Do not auto-hide if customization panel is open
+        if (panel.classList.contains("show")) return;
+        
+        if (areBarsVisible) {
+            topbar.classList.add("hidden");
+            bottombar.classList.add("hidden");
+            areBarsVisible = false;
+        }
+    }
+
+    function resetBarTimer() {
+        clearTimeout(barTimeout);
+        barTimeout = setTimeout(hideBars, 3000); // 3 seconds idle
+    }
+
+    // Page updates and UI rendering
+    function updateUI() {
+        // Transition fade effect
+        contentEl.classList.add("fade-out");
+        
+        setTimeout(() => {
+            const pageText = pages[currentPage - 1] || "";
+            kickerEl.textContent = `Trang ${currentPage}`;
+            if (readerContentFormat === "html") {
+                renderHtmlPage(pageText);
+            } else {
+                renderTextPage(pageText);
+            }
+            
+            contentEl.classList.remove("fade-out");
+        }, 120);
 
         const pct = Math.round((currentPage / totalPages) * 100);
         progressBar.style.width = `${pct}%`;
-        pageIndicator.textContent = `Trang ${currentPage} / ${readableTotal} · ${pct}%`;
+        
+        // Display progress and remaining reading estimation
+        pageIndicator.textContent = `Trang ${currentPage} / ${totalPages} · ${pct}% · ${getRemainingTimeText()}`;
+        
         prevBtn.disabled = currentPage === 1;
         nextBtn.disabled = currentPage === totalPages;
-        updatePageList();
+        
+        pageNumberInput.value = currentPage;
+        pageRange.value = currentPage;
+        
+        updateBookmarkButtonState();
         saveProgress();
+        
         window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -584,8 +960,16 @@
         updateUI();
     }
 
-    prevBtn.addEventListener("click", () => goToPage(currentPage - 1));
-    nextBtn.addEventListener("click", () => goToPage(currentPage + 1));
+    // Event listeners registration
+    prevBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        goToPage(currentPage - 1);
+    });
+    nextBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        goToPage(currentPage + 1);
+    });
+    
     document.getElementById("jumpPageBtn").addEventListener("click", () => {
         goToPage(Number(pageNumberInput.value || currentPage));
         panel.classList.remove("show");
@@ -597,17 +981,31 @@
         }
     });
     pageRange.addEventListener("input", () => goToPage(Number(pageRange.value)));
-    document.getElementById("togglePanelBtn").addEventListener("click", () => panel.classList.add("show"));
-    document.getElementById("closePanelBtn").addEventListener("click", () => panel.classList.remove("show"));
-    document.getElementById("decreaseFontBtn").addEventListener("click", () => {
-        fontSizeRange.value = Math.max(16, Number(fontSizeRange.value) - 1);
-        fontSizeRange.dispatchEvent(new Event("input"));
+    
+    // Toggle configuration panel
+    document.getElementById("togglePanelBtn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        panel.classList.add("show");
+        clearTimeout(barTimeout); // Prevent auto-hiding when panel is open
     });
-    document.getElementById("increaseFontBtn").addEventListener("click", () => {
-        fontSizeRange.value = Math.min(30, Number(fontSizeRange.value) + 1);
-        fontSizeRange.dispatchEvent(new Event("input"));
+    document.getElementById("closePanelBtn").addEventListener("click", () => {
+        panel.classList.remove("show");
+        resetBarTimer();
+    });
+    
+    // Bookmark events
+    bookmarkBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleBookmark();
+    });
+    
+    // Fullscreen event
+    fullscreenBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleFullscreen();
     });
 
+    // Theme select options
     document.querySelectorAll(".reader-theme-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
             const settings = getSettings();
@@ -617,6 +1015,17 @@
         });
     });
 
+    // Font select options
+    document.querySelectorAll(".reader-font-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const settings = getSettings();
+            settings.fontChoice = btn.dataset.fontChoice;
+            saveSettings(settings);
+            applySettings(settings);
+        });
+    });
+
+    // Size range and widths input adjustments
     fontSizeRange.addEventListener("input", () => {
         const settings = getSettings();
         settings.fontSize = Number(fontSizeRange.value);
@@ -630,22 +1039,62 @@
         applySettings(settings);
     });
 
+    // Click track to jump page directly
+    progressTrack.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const rect = progressTrack.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const width = rect.width;
+        const clickPct = clickX / width;
+        const targetPage = Math.max(1, Math.round(clickPct * totalPages));
+        goToPage(targetPage);
+    });
+
+    // Keyboard bindings
     document.addEventListener("keydown", (event) => {
         if (event.target.matches("input, textarea, select")) return;
+        
         if (event.key === "ArrowRight" || event.key === " ") {
             event.preventDefault();
             goToPage(currentPage + 1);
+            showBars();
         }
         if (event.key === "ArrowLeft") {
             event.preventDefault();
             goToPage(currentPage - 1);
+            showBars();
         }
         if (event.key === "Escape") {
             panel.classList.remove("show");
+            if (document.fullscreenElement) {
+                toggleFullscreen();
+            }
+        }
+        if (event.key.toLowerCase() === "f") {
+            toggleFullscreen();
+        }
+        if (event.key.toLowerCase() === "b") {
+            toggleBookmark();
         }
     });
 
+    // Immersive HUD Trigger Mouse Events
+    document.addEventListener("mousemove", (e) => {
+        // Show bars if pointer is near top (within 90px) or bottom (within 90px)
+        if (e.clientY <= 90 || e.clientY >= window.innerHeight - 90) {
+            showBars();
+        } else {
+            showBars(); // Resets timer on movement
+        }
+    });
+    document.addEventListener("click", () => {
+        showBars();
+    });
+
+    // Initialize Page
     applySettings(getSettings());
     updateUI();
+    renderBookmarkList();
+    resetBarTimer();
 </script>
 {% endblock %}
