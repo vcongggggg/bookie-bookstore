@@ -1,0 +1,52 @@
+{% extends "email/base_email.html" %}
+{% block title %}Cập nhật đơn hàng #{{ order.pk }}{% endblock %}
+{% block content %}
+<h1 style="margin:0 0 8px;font-size:22px;color:#2D2A26;font-weight:700;">
+    Đơn hàng #{{ order.pk }} đã được cập nhật
+</h1>
+<p style="font-size:15px;color:#4A433B;line-height:1.7;margin:0 0 24px;">
+    Xin chào <strong>{{ user.username }}</strong>, trạng thái đơn hàng của bạn đã thay đổi:
+</p>
+
+<!-- Status change -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:24px;">
+<tr>
+<td align="center">
+    <table role="presentation" cellspacing="0" cellpadding="0">
+    <tr>
+    <td style="background:#f3f0ea;border-radius:10px;padding:12px 20px;text-align:center;">
+        <span style="font-size:13px;color:#8A7E73;display:block;">Trạng thái cũ</span>
+        <span style="font-size:16px;font-weight:600;color:#6B5E52;">{{ old_status }}</span>
+    </td>
+    <td style="padding:0 16px;font-size:24px;color:#C05621;">→</td>
+    <td style="background:linear-gradient(135deg,#C05621,#D69E2E);border-radius:10px;padding:12px 20px;text-align:center;">
+        <span style="font-size:13px;color:rgba(255,255,255,.8);display:block;">Trạng thái mới</span>
+        <span style="font-size:16px;font-weight:700;color:#fff;">{{ new_status }}</span>
+    </td>
+    </tr>
+    </table>
+</td>
+</tr>
+</table>
+
+<!-- Info box -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f9f6f1;border-radius:12px;border:1px solid #E6DED3;margin-bottom:20px;">
+<tr>
+<td style="padding:16px;">
+    <p style="margin:0 0 8px;font-size:14px;color:#4A433B;">
+        <strong>Mã đơn hàng:</strong> #{{ order.pk }}
+    </p>
+    <p style="margin:0 0 8px;font-size:14px;color:#4A433B;">
+        <strong>Ngày đặt:</strong> {{ order.created_at|date:"d/m/Y H:i" }}
+    </p>
+    <p style="margin:0;font-size:14px;color:#4A433B;">
+        <strong>Tổng tiền:</strong> {{ order.total|floatformat:0 }}₫
+    </p>
+</td>
+</tr>
+</table>
+
+<p style="font-size:14px;color:#8A7E73;margin:0;">
+    Nếu bạn có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi qua trang Liên hệ trên website.
+</p>
+{% endblock %}

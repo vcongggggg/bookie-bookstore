@@ -606,6 +606,11 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
+            try:
+                from books.email_service import send_welcome_email
+                send_welcome_email(user)
+            except Exception:
+                pass  # We don't block the user signup flow if email fails to trigger
             messages.success(request, "Đăng ký thành công! Chào mừng bạn đến Smart Bookstore.")
             return redirect("home")
     else:
@@ -810,8 +815,28 @@ def checkout(request):
 
             _set_cart(request, {})
             
+            # Check for low stock books and send alert
+            try:
+                from books.email_service import send_low_stock_alert_email
+                low_stock_books = []
+                for row in locked_items:
+                    fresh_book = Book.objects.get(pk=row["book"].pk)
+                    if fresh_book.stock < getattr(settings, "LOW_STOCK_THRESHOLD", 10):
+                        low_stock_books.append(fresh_book)
+                if low_stock_books:
+                    send_low_stock_alert_email(low_stock_books)
+            except Exception:
+                pass  # Do not block order completion if email alert fails
+
             if order.payment_method != "cod":
                 return redirect("payment_gateway", pk=order.pk)
+
+            # For COD, send order confirmation email immediately
+            try:
+                from books.email_service import send_order_confirmation_email
+                send_order_confirmation_email(order)
+            except Exception:
+                pass
 
             messages.success(request, f"Đặt hàng thành công! Mã đơn: #{order.pk}")
             return redirect("order_detail", pk=order.pk)
@@ -918,6 +943,11 @@ def vnpay_return(request):
             if order.status == "pending":
                 order.status = "confirmed"
                 order.save(update_fields=["status"])
+                try:
+                    from books.email_service import send_order_confirmation_email
+                    send_order_confirmation_email(order)
+                except Exception:
+                    pass
                 messages.success(request, f"Thanh toán VNPay thành công cho đơn hàng #{order.pk}!")
             else:
                 messages.info(request, f"Đơn hàng #{order.pk} đã được xử lý trước đó.")
@@ -937,6 +967,11 @@ def payment_confirm(request, pk: int):
     if order.status == "pending":
         order.status = "confirmed"
         order.save(update_fields=["status"])
+        try:
+            from books.email_service import send_order_confirmation_email
+            send_order_confirmation_email(order)
+        except Exception:
+            pass
         messages.success(request, f"Thanh toán thành công cho đơn hàng #{order.pk}!")
     
     return redirect("order_detail", pk=order.pk)
@@ -1946,8 +1981,14 @@ def api_update_order_status(request, pk: int):
     order = get_object_or_404(Order, pk=pk)
     new_status = request.POST.get("status")
     if new_status in dict(Order.STATUS_CHOICES):
+        old_status = order.status
         order.status = new_status
         order.save(update_fields=["status"])
+        try:
+            from books.email_service import send_order_status_update_email
+            send_order_status_update_email(order, old_status)
+        except Exception:
+            pass
         _log_admin_action(
             request,
             "order_status_update",
@@ -1983,6 +2024,7 @@ def cancel_order(request, pk: int):
             user=request.user,
         )
         if order.status in ("pending", "confirmed"):
+            old_status = order.status
             order.status = "cancelled"
             order.save(update_fields=["status"])
             for item in order.items.select_related("book"):
@@ -1991,6 +2033,11 @@ def cancel_order(request, pk: int):
                 Coupon.objects.filter(pk=order.coupon_id, used_count__gt=0).update(
                     used_count=F("used_count") - 1
                 )
+            try:
+                from books.email_service import send_order_status_update_email
+                send_order_status_update_email(order, old_status)
+            except Exception:
+                pass
             messages.success(request, f"Da huy don hang #{order.pk}.")
         else:
             messages.error(request, "Khong the huy don hang o trang thai nay.")

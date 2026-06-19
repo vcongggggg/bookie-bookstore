@@ -1,0 +1,30 @@
+{% extends "email/base_email.html" %}
+{% block title %}Cảnh báo tồn kho thấp{% endblock %}
+{% block content %}
+<h1 style="margin:0 0 8px;font-size:22px;color:#C53030;font-weight:700;">
+    ⚠️ Cảnh báo tồn kho thấp
+</h1>
+<p style="font-size:15px;color:#4A433B;line-height:1.7;margin:0 0 24px;">
+    Các sản phẩm sau đây có số lượng tồn kho dưới <strong>{{ threshold }} cuốn</strong>.
+    Vui lòng kiểm tra và bổ sung hàng kịp thời.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E6DED3;border-radius:12px;overflow:hidden;margin-bottom:20px;">
+<tr style="background:#C53030;">
+    <td style="padding:10px 16px;color:#fff;font-size:13px;font-weight:600;">Tên sách</td>
+    <td style="padding:10px 12px;color:#fff;font-size:13px;font-weight:600;text-align:center;">Tác giả</td>
+    <td style="padding:10px 16px;color:#fff;font-size:13px;font-weight:600;text-align:center;">Tồn kho</td>
+</tr>
+{% for book in books %}
+<tr style="background:{% if forloop.counter|divisibleby:2 %}#fef2f2{% else %}#FFFCF7{% endif %};">
+    <td style="padding:10px 16px;font-size:13px;color:#2D2A26;border-top:1px solid #E6DED3;">{{ book.title }}</td>
+    <td style="padding:10px 12px;font-size:13px;color:#4A433B;text-align:center;border-top:1px solid #E6DED3;">{{ book.author }}</td>
+    <td style="padding:10px 16px;font-size:14px;font-weight:700;color:#C53030;text-align:center;border-top:1px solid #E6DED3;">{{ book.stock }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<p style="font-size:14px;color:#8A7E73;margin:0;">
+    Truy cập <strong>Dashboard → Quản lý sách</strong> để cập nhật số lượng tồn kho.
+</p>
+{% endblock %}

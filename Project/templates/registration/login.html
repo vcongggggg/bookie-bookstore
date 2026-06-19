@@ -30,8 +30,11 @@
                     </div>
                 </div>
                 <div class="mb-4">
-                    <label for="id_password" class="form-label fw-600">Mật khẩu</label>
-                    <div class="input-group">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <label for="id_password" class="form-label fw-600 mb-0">Mật khẩu</label>
+                        <a href="{% url 'password_reset' %}" style="font-size:0.85rem;color:var(--primary);text-decoration:none">Quên mật khẩu?</a>
+                    </div>
+                    <div class="input-group mt-2">
                         <span class="input-group-text" style="border-radius:var(--radius-sm) 0 0 var(--radius-sm);border:2px solid var(--border);border-right:none;background:var(--bg-body)"><i class="bi bi-lock" style="color:var(--text-muted)"></i></span>
                         <input type="password" name="password" id="id_password" class="form-control" style="border-left:none" required placeholder="Nhập mật khẩu">
                     </div>

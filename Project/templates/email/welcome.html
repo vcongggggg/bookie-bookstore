@@ -1,0 +1,38 @@
+{% extends "email/base_email.html" %}
+{% block title %}Chào mừng bạn đến với Bookie!{% endblock %}
+{% block content %}
+<h1 style="margin:0 0 16px;font-size:24px;color:#2D2A26;font-weight:700;">
+    Chào mừng {{ user.username }}! 🎉
+</h1>
+<p style="font-size:15px;color:#4A433B;line-height:1.7;margin:0 0 20px;">
+    Cảm ơn bạn đã tạo tài khoản tại <strong>Bookie</strong> — Hệ thống nhà sách thông minh tích hợp trí tuệ nhân tạo.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:24px;">
+<tr>
+<td style="background:#f9f6f1;border-radius:12px;padding:20px;border:1px solid #E6DED3;">
+    <h3 style="margin:0 0 12px;font-size:16px;color:#2D2A26;">🚀 Bạn có thể bắt đầu ngay:</h3>
+    <ul style="margin:0;padding-left:20px;font-size:14px;color:#4A433B;line-height:2;">
+        <li>Khám phá hàng trăm đầu sách chất lượng</li>
+        <li>Đọc E-book miễn phí trực tuyến</li>
+        <li>Trò chuyện với <strong>Chatbot AI Bookie</strong> để được gợi ý sách</li>
+        <li>Theo dõi lịch sử đọc và Reading DNA cá nhân</li>
+    </ul>
+</td>
+</tr>
+</table>
+
+<table role="presentation" cellspacing="0" cellpadding="0">
+<tr>
+<td style="border-radius:10px;background:linear-gradient(135deg,#C05621,#D69E2E);">
+    <a href="#" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;">
+        Bắt đầu khám phá →
+    </a>
+</td>
+</tr>
+</table>
+
+<p style="font-size:14px;color:#8A7E73;margin:24px 0 0;">
+    Chúc bạn có những trải nghiệm đọc sách tuyệt vời! 📖
+</p>
+{% endblock %}

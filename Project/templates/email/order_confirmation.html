@@ -1,0 +1,69 @@
+{% extends "email/base_email.html" %}
+{% block title %}Xác nhận đơn hàng #{{ order.pk }}{% endblock %}
+{% block content %}
+<h1 style="margin:0 0 8px;font-size:22px;color:#2D2A26;font-weight:700;">
+    Đơn hàng #{{ order.pk }} đã được tạo thành công! ✅
+</h1>
+<p style="font-size:14px;color:#8A7E73;margin:0 0 24px;">
+    {{ order.created_at|date:"d/m/Y H:i" }}
+</p>
+
+<!-- Order items table -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E6DED3;border-radius:12px;overflow:hidden;margin-bottom:20px;">
+<tr style="background:#2D2A26;">
+    <td style="padding:10px 16px;color:#fff;font-size:13px;font-weight:600;">Sách</td>
+    <td style="padding:10px 12px;color:#fff;font-size:13px;font-weight:600;text-align:center;">SL</td>
+    <td style="padding:10px 12px;color:#fff;font-size:13px;font-weight:600;text-align:right;">Đơn giá</td>
+    <td style="padding:10px 16px;color:#fff;font-size:13px;font-weight:600;text-align:right;">Thành tiền</td>
+</tr>
+{% for item in items %}
+<tr style="background:{% if forloop.counter|divisibleby:2 %}#f9f6f1{% else %}#FFFCF7{% endif %};">
+    <td style="padding:10px 16px;font-size:13px;color:#2D2A26;border-top:1px solid #E6DED3;">{{ item.book.title }}</td>
+    <td style="padding:10px 12px;font-size:13px;color:#4A433B;text-align:center;border-top:1px solid #E6DED3;">{{ item.quantity }}</td>
+    <td style="padding:10px 12px;font-size:13px;color:#4A433B;text-align:right;border-top:1px solid #E6DED3;">{{ item.price|floatformat:0 }}₫</td>
+    <td style="padding:10px 16px;font-size:13px;color:#2D2A26;font-weight:600;text-align:right;border-top:1px solid #E6DED3;">{{ item.subtotal|floatformat:0 }}₫</td>
+</tr>
+{% endfor %}
+</table>
+
+<!-- Totals -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:24px;">
+<tr>
+<td style="padding:6px 0;font-size:14px;color:#4A433B;">Tạm tính:</td>
+<td style="padding:6px 0;font-size:14px;color:#4A433B;text-align:right;">{{ order.subtotal|floatformat:0 }}₫</td>
+</tr>
+{% if order.discount_amount %}
+<tr>
+<td style="padding:6px 0;font-size:14px;color:#2F855A;">Giảm giá{% if order.coupon %} ({{ order.coupon.code }}){% endif %}:</td>
+<td style="padding:6px 0;font-size:14px;color:#2F855A;text-align:right;">-{{ order.discount_amount|floatformat:0 }}₫</td>
+</tr>
+{% endif %}
+<tr>
+<td style="padding:10px 0;font-size:18px;color:#2D2A26;font-weight:700;border-top:2px solid #E6DED3;">Tổng cộng:</td>
+<td style="padding:10px 0;font-size:18px;color:#C05621;font-weight:700;text-align:right;border-top:2px solid #E6DED3;">{{ order.total|floatformat:0 }}₫</td>
+</tr>
+</table>
+
+<!-- Order details -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f9f6f1;border-radius:12px;padding:16px;border:1px solid #E6DED3;margin-bottom:20px;">
+<tr>
+<td style="padding:16px;">
+    <p style="margin:0 0 8px;font-size:14px;color:#4A433B;">
+        <strong>Phương thức thanh toán:</strong> {{ order.get_payment_method_display }}
+    </p>
+    <p style="margin:0 0 8px;font-size:14px;color:#4A433B;">
+        <strong>Trạng thái:</strong> {{ order.status_display_vi }}
+    </p>
+    {% if order.shipping_address %}
+    <p style="margin:0;font-size:14px;color:#4A433B;">
+        <strong>Địa chỉ giao hàng:</strong> {{ order.shipping_address }}
+    </p>
+    {% endif %}
+</td>
+</tr>
+</table>
+
+<p style="font-size:14px;color:#8A7E73;margin:0;">
+    📎 Hóa đơn PDF được đính kèm trong email này.
+</p>
+{% endblock %}
