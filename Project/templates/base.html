@@ -1253,7 +1253,7 @@
             </div>
         </div>
     </div>
-    <div class="chat-bubble" onclick="toggleChat()" id="chatBubble">
+    <div class="chat-bubble" id="chatBubble">
         <i class="bi bi-chat-dots-fill"></i>
     </div>
 </div>
@@ -1763,7 +1763,6 @@
         
         chatWidget.style.transition = 'none';
         chatBubble.style.cursor = 'grabbing';
-        e.preventDefault();
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -1800,6 +1799,10 @@
             sessionStorage.removeItem('bookie_chat_open');
         }
     };
+
+    chatBubble.addEventListener('click', () => {
+        window.toggleChat();
+    });
 
     // Restoring chat history and open state
     document.addEventListener('DOMContentLoaded', () => {
