@@ -427,8 +427,8 @@ def api_update_order_status(request, pk: int):
         order.status = new_status
         order.save(update_fields=["status"])
         try:
-            from books.email_service import send_order_status_update_email
-            send_order_status_update_email(order, old_status)
+            from ..tasks import send_order_status_update_email_task
+            send_order_status_update_email_task(order.pk, old_status)
         except Exception:
             pass
         _log_admin_action(

@@ -28,88 +28,33 @@ def checkout(request):
         if form.is_valid():
             coupon_code = form.cleaned_data.get("coupon_code", "").strip()
 
-            with transaction.atomic():
-                locked_books = {
-                    book.pk: book
-                    for book in Book.objects.select_for_update().filter(
-                        pk__in=[row["book"].pk for row in items]
-                    )
-                }
-                locked_items = []
-                for row in items:
-                    book = locked_books.get(row["book"].pk)
-                    if not book or row["quantity"] > book.stock:
-                        messages.error(
-                            request,
-                            f"'{row['book'].title}' không đủ hàng cho số lượng bạn chọn.",
-                        )
-                        return redirect("cart")
-                    locked_items.append({**row, "book": book, "subtotal": book.price * row["quantity"]})
+            if coupon_code:
+                from ..services import validate_coupon_for_order
+                res = validate_coupon_for_order(coupon_code, subtotal)
+                if res["status"] == "error":
+                    messages.warning(request, res["message"])
 
-                locked_subtotal = sum(row["subtotal"] for row in locked_items)
-                discount_amount = 0
-                applied_coupon = None
-
-                if coupon_code:
-                    try:
-                        coupon = Coupon.objects.select_for_update().get(code__iexact=coupon_code)
-                        if coupon.is_valid and locked_subtotal >= coupon.min_order_amount:
-                            applied_coupon = coupon
-                            final_total = coupon.apply_discount(locked_subtotal)
-                            discount_amount = locked_subtotal - final_total
-                        else:
-                            messages.warning(request, "Mã giảm giá không hợp lệ hoặc không đủ điều kiện.")
-                    except Coupon.DoesNotExist:
-                        messages.warning(request, "Mã giảm giá không tồn tại.")
-
-                order = Order.objects.create(
+            try:
+                from ..services import create_order_from_cart, ServiceError
+                order = create_order_from_cart(
                     user=request.user,
                     shipping_address=form.cleaned_data["shipping_address"],
                     note=form.cleaned_data.get("note", ""),
-                    coupon=applied_coupon,
-                    discount_amount=discount_amount,
+                    coupon_code=coupon_code,
                     payment_method=form.cleaned_data["payment_method"],
+                    items=items,
                 )
-                for row in locked_items:
-                    OrderItem.objects.create(
-                        order=order,
-                        book=row["book"],
-                        quantity=row["quantity"],
-                        price=row["book"].price,
-                        is_digital_purchase=False,
-                    )
-                    Book.objects.filter(pk=row["book"].pk).update(stock=F("stock") - row["quantity"])
+                
+                _set_cart(request, {})
 
-                if applied_coupon:
-                    Coupon.objects.filter(pk=applied_coupon.pk).update(used_count=F("used_count") + 1)
+                if order.payment_method != "cod":
+                    return redirect("payment_gateway", pk=order.pk)
 
-            _set_cart(request, {})
-            
-            # Check for low stock books and send alert
-            try:
-                from books.email_service import send_low_stock_alert_email
-                low_stock_books = []
-                for row in locked_items:
-                    fresh_book = Book.objects.get(pk=row["book"].pk)
-                    if fresh_book.stock < getattr(settings, "LOW_STOCK_THRESHOLD", 10):
-                        low_stock_books.append(fresh_book)
-                if low_stock_books:
-                    send_low_stock_alert_email(low_stock_books)
-            except Exception:
-                pass  # Do not block order completion if email alert fails
-
-            if order.payment_method != "cod":
-                return redirect("payment_gateway", pk=order.pk)
-
-            # For COD, send order confirmation email immediately
-            try:
-                from books.email_service import send_order_confirmation_email
-                send_order_confirmation_email(order)
-            except Exception:
-                pass
-
-            messages.success(request, f"Đặt hàng thành công! Mã đơn: #{order.pk}")
-            return redirect("order_detail", pk=order.pk)
+                messages.success(request, f"Đặt hàng thành công! Mã đơn: #{order.pk}")
+                return redirect("order_detail", pk=order.pk)
+            except ServiceError as exc:
+                messages.error(request, str(exc))
+                return redirect("cart")
     else:
         form = CheckoutForm()
 
@@ -167,8 +112,8 @@ def vnpay_return(request):
                 order.status = "confirmed"
                 order.save(update_fields=["status"])
                 try:
-                    from books.email_service import send_order_confirmation_email
-                    send_order_confirmation_email(order)
+                    from ..tasks import send_order_confirmation_email_task
+                    send_order_confirmation_email_task(order.pk)
                 except Exception:
                     pass
                 messages.success(request, f"Thanh toán VNPay thành công cho đơn hàng #{order.pk}!")
@@ -191,8 +136,8 @@ def payment_confirm(request, pk: int):
         order.status = "confirmed"
         order.save(update_fields=["status"])
         try:
-            from books.email_service import send_order_confirmation_email
-            send_order_confirmation_email(order)
+            from ..tasks import send_order_confirmation_email_task
+            send_order_confirmation_email_task(order.pk)
         except Exception:
             pass
         messages.success(request, f"Thanh toán thành công cho đơn hàng #{order.pk}!")
@@ -276,31 +221,13 @@ def order_invoice_pdf(request, pk: int):
 @login_required
 @require_POST
 def cancel_order(request, pk: int):
-    with transaction.atomic():
-        order = get_object_or_404(
-            Order.objects.select_for_update().select_related("coupon"),
-            pk=pk,
-            user=request.user,
-        )
-        if order.status in ("pending", "confirmed"):
-            old_status = order.status
-            order.status = "cancelled"
-            order.save(update_fields=["status"])
-            for item in order.items.select_related("book"):
-                Book.objects.filter(pk=item.book_id).update(stock=F("stock") + item.quantity)
-            if order.coupon_id:
-                Coupon.objects.filter(pk=order.coupon_id, used_count__gt=0).update(
-                    used_count=F("used_count") - 1
-                )
-            try:
-                from books.email_service import send_order_status_update_email
-                send_order_status_update_email(order, old_status)
-            except Exception:
-                pass
-            messages.success(request, f"Da huy don hang #{order.pk}.")
-        else:
-            messages.error(request, "Khong the huy don hang o trang thai nay.")
-    return redirect("order_detail", pk=order.pk)
+    try:
+        from ..services import cancel_order_by_user, ServiceError
+        order = cancel_order_by_user(user=request.user, order_pk=pk)
+        messages.success(request, f"Da huy don hang #{order.pk}.")
+    except ServiceError as exc:
+        messages.error(request, str(exc))
+    return redirect("order_detail", pk=pk)
 
 
 # ═══════════════════════════════════════════════════════════════════

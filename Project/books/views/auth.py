@@ -20,8 +20,8 @@ def register(request):
             user = form.save()
             login(request, user)
             try:
-                from books.email_service import send_welcome_email
-                send_welcome_email(user)
+                from ..tasks import send_welcome_email_task
+                send_welcome_email_task(user.pk)
             except Exception:
                 pass  # We don't block the user signup flow if email fails to trigger
             messages.success(request, "Đăng ký thành công! Chào mừng bạn đến Smart Bookstore.")

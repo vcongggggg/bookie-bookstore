@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sitemaps',
+    'huey.contrib.djhuey',
     'books',
 ]
 
@@ -219,3 +220,16 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Bookie <noreply@booki
 
 # Low stock alert threshold
 LOW_STOCK_THRESHOLD = int(os.environ.get('LOW_STOCK_THRESHOLD', '10'))
+
+# Huey background task queue configuration
+HUEY = {
+    'name': 'bookstore',
+    'huey_class': 'huey.SqliteHuey',
+    'filename': os.path.join(BASE_DIR, 'huey.db'),
+    'immediate': 'test' in sys.argv,  # Run synchronously when testing
+    'consumer': {
+        'workers': 2,
+        'worker_type': 'thread',
+    },
+}
+

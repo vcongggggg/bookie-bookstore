@@ -60,12 +60,7 @@ def send_html_email(subject, template_name, context, recipient_list, attachments
         for filename, content, mime_type in attachments:
             msg.attach(filename, content, mime_type)
 
-    # Send synchronously in tests to avoid race conditions and connection isolation issues
-    if getattr(settings, "EMAIL_BACKEND", "") == "django.core.mail.backends.locmem.EmailBackend":
-        _send_in_thread(msg)
-    else:
-        thread = threading.Thread(target=_send_in_thread, args=(msg,), daemon=True)
-        thread.start()
+    msg.send(fail_silently=False)
 
 
 # ─────────────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ env/
 *.log
 local_settings.py
 db.sqlite3
+huey.db
 media/
 staticfiles/
 .coverage
