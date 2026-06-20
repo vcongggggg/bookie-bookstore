@@ -1,4 +1,4 @@
-name: Django tests
+name: Django CI
 
 on:
   push:
@@ -8,14 +8,13 @@ on:
       - "hardening/**"
       - "testing/**"
       - "docs/**"
-      - security-hardening
   pull_request:
     branches:
       - main
-      - security-hardening
 
 jobs:
   test:
+    name: Tests & Coverage
     runs-on: ubuntu-latest
 
     defaults:
@@ -43,4 +42,56 @@ jobs:
       - name: Run test suite with coverage
         run: |
           coverage run Project/manage.py test books
-          coverage report --fail-under=35
+          coverage report --fail-under=65
+          coverage xml -o coverage.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r Project/requirements.txt
+          python -m pip install pip-audit bandit
+
+      - name: Scan dependencies for vulnerabilities (pip-audit)
+        run: pip-audit -r Project/requirements.txt
+
+      - name: Scan source code for security issues (bandit)
+        run: |
+          bandit -r Project/books/ Project/bookstore/ \
+            -x "*/tests.py,*/test_*.py,*/migrations/*" \
+            -s B101 \
+            -f txt \
+            --severity-level medium
+
+      - name: Validate .env.example has no real secrets
+        run: |
+          echo "Checking .env.example for leaked secrets..."
+          if grep -qiE '(sk-|ghp_|AKIA|password123|real-secret)' Project/.env.example; then
+            echo "ERROR: .env.example may contain real secrets!"
+            exit 1
+          fi
+          echo "OK: .env.example looks clean."
