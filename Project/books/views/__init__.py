@@ -1,6 +1,6 @@
 from .catalog import (
     home, book_list, ebook_list, book_detail, category_list, category_detail, 
-    about, contact, robots_txt, rate_book, api_search, health_check
+    about, contact, robots_txt, rate_book, api_search, health_check, health_live, health_ready
 )
 from .auth import register, BookieLoginView
 from .cart import cart_view, add_to_cart, update_cart, remove_from_cart, api_apply_coupon

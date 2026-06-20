@@ -48,7 +48,7 @@ This document provides a comprehensive security review of the **Bookie** booksto
 
 ### Controls Implemented
 * **HTML Sanitization:** A custom `HTMLParser` runs on uploaded ebook HTML blocks to strip out tags like `<script>`, `<iframe>`, and `<style>` while retaining formatting and Gutenberg image layouts.
-* **ORM Parameterization:** The application queries books and catalogs exclusively using Django ORM syntax (`Book.objects.filter(...)`), which automatically escapes and parameterizes database variables to eliminate SQLi vectors.
+* **ORM Parameterization:** The application queries books and catalogs exclusively using Django ORM syntax (`Book.objects.filter(...)`), which automatically escapes and parameterizes database variables to mitigate SQLi vectors.
 * **Default Auto-Escaping:** Django templates utilize the auto-escape feature to output user-submitted fields as safe plain text.
 * **Chatbot Injection Shields:** The AI query handler checks questions against a blacklist of prompt-injection keywords (e.g., `"ignore previous instructions"`, `"system prompt"`, `"you are now"`). Responses are blocked and safe fallback messages are rendered if threat criteria are met.
 

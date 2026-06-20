@@ -40,9 +40,12 @@
                 </div>
 
                 <div class="d-grid gap-2 mt-4">
-                    <a href="{% url 'payment_confirm' order.pk %}" class="btn btn-gradient py-3 fw-bold" style="border-radius:12px">
-                        <i class="bi bi-shield-check me-2"></i>Xác nhận đã thanh toán (Simulate)
-                    </a>
+                    <form action="{% url 'payment_confirm' order.pk %}" method="post" class="w-100 m-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-gradient w-100 py-3 fw-bold" style="border-radius:12px">
+                            <i class="bi bi-shield-check me-2"></i>Xác nhận đã thanh toán (Simulate)
+                        </button>
+                    </form>
                     <a href="{% url 'order_detail' order.pk %}" class="btn btn-link text-muted small text-decoration-none">
                         Hủy giao dịch và quay lại
                     </a>

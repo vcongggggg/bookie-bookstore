@@ -851,7 +851,7 @@ class SecurityLockoutAndIDORTests(TestCase):
     def test_payment_confirm_idor_restriction(self):
         """Verify that user2 cannot confirm payment for user1's order."""
         self.client.force_login(self.user2)
-        response = self.client.get(reverse("payment_confirm", args=[self.order1.pk]))
+        response = self.client.post(reverse("payment_confirm", args=[self.order1.pk]))
         self.assertEqual(response.status_code, 404)
 
     def test_cancel_order_idor_restriction(self):
@@ -1005,5 +1005,117 @@ class EnterpriseCVUpgradeTests(TestCase):
         response = chatbot.get_response(injection_text, history=[], last_books=[])
         self.assertEqual(response["type"], "text")
         self.assertIn("vi phạm chính sách an toàn thông tin", response["text"])
+
+    def test_health_probes_liveness_and_readiness(self):
+        """Verify new liveness and readiness probe endpoints."""
+        # Liveness
+        response = self.client.get(reverse("health_live"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["check"], "liveness")
+
+        # Readiness
+        response = self.client.get(reverse("health_ready"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ready")
+
+    def test_payment_confirm_requires_post(self):
+        """Verify that payment_confirm view strictly rejects GET requests."""
+        order = Order.objects.create(user=self.user, shipping_address="Test Address", payment_method="cod")
+        self.client.force_login(self.user)
+
+        # GET request must fail with 405
+        response = self.client.get(reverse("payment_confirm", args=[order.pk]))
+        self.assertEqual(response.status_code, 405)
+
+        # POST request must succeed
+        response = self.client.post(reverse("payment_confirm", args=[order.pk]))
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, "paid")
+
+    def test_vnpay_return_hardened_checks(self):
+        """Verify that vnpay_return validates payment method and checks replay transaction ID."""
+        order = Order.objects.create(user=self.user, payment_method="cod")
+        OrderItem.objects.create(order=order, book=self.book, quantity=1, price=200.0)
+        
+        # vnpay callback details
+        from books.vnpay import VNPay
+        with patch.object(VNPay, "validate_response", return_value=True):
+            # Attempt to confirm payment with mismatched method (COD order)
+            response = self.client.get(
+                reverse("vnpay_return"),
+                {"vnp_TxnRef": order.pk, "vnp_ResponseCode": "00", "vnp_Amount": "20000"}
+            )
+            self.assertEqual(response.status_code, 302)
+            order.refresh_from_db()
+            self.assertNotEqual(order.payment_status, "paid")
+
+            # Correct payment method (VNPay order)
+            order2 = Order.objects.create(user=self.user, payment_method="vnpay")
+            OrderItem.objects.create(order=order2, book=self.book, quantity=1, price=200.0)
+            response = self.client.get(
+                reverse("vnpay_return"),
+                {"vnp_TxnRef": order2.pk, "vnp_ResponseCode": "00", "vnp_Amount": "20000", "vnp_TransactionNo": "TX-123456"}
+            )
+            self.assertEqual(response.status_code, 302)
+            order2.refresh_from_db()
+            self.assertEqual(order2.payment_status, "paid")
+            self.assertEqual(order2.transaction_id, "TX-123456")
+
+            # Replay protection: Attempt to use the same transaction ID on a new order
+            order3 = Order.objects.create(user=self.user, payment_method="vnpay")
+            OrderItem.objects.create(order=order3, book=self.book, quantity=1, price=200.0)
+            response = self.client.get(
+                reverse("vnpay_return"),
+                {"vnp_TxnRef": order3.pk, "vnp_ResponseCode": "00", "vnp_Amount": "20000", "vnp_TransactionNo": "TX-123456"}
+            )
+            self.assertEqual(response.status_code, 302)
+            order3.refresh_from_db()
+            self.assertNotEqual(order3.payment_status, "paid")
+
+    def test_api_books_parameter_safeguards(self):
+        """Verify that api_books handles non-integer pagination and invalid categories gracefully."""
+        # Non-integer pagination parameters must fallback safely instead of throwing 500 error
+        response = self.client.get(reverse("api_books"), {"page": "invalid", "per_page": "invalid"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["current_page"], 1)
+
+        # Invalid non-integer category ID must return 400 Bad Request
+        response = self.client.get(reverse("api_books"), {"category": "invalid"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_api_cart_input_checks(self):
+        """Verify api_cart handles invalid requests, actions, and non-existing books."""
+        # POST invalid JSON format
+        response = self.client.post(
+            reverse("api_cart"),
+            data="not-a-json",
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # POST invalid action
+        response = self.client.post(
+            reverse("api_cart"),
+            data=json.dumps({"action": "invalid_action", "book_id": self.book.pk}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # POST invalid book_id
+        response = self.client.post(
+            reverse("api_cart"),
+            data=json.dumps({"action": "add", "book_id": 999999}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 404)
+
+        # POST invalid quantity
+        response = self.client.post(
+            reverse("api_cart"),
+            data=json.dumps({"action": "add", "book_id": self.book.pk, "quantity": -5}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 400)
 
 

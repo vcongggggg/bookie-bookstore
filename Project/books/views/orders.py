@@ -1,7 +1,9 @@
 from .helpers import *
 import os
 import uuid
+from django.db import transaction
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from ..vnpay import VNPay
 from .helpers import _cart_items, _rate_limit_response, _set_cart
 
@@ -109,28 +111,45 @@ def vnpay_return(request):
     if vnp.validate_response(request.GET):
         order_id = request.GET.get('vnp_TxnRef')
         response_code = request.GET.get('vnp_ResponseCode')
-        order = get_object_or_404(Order, pk=order_id)
         
-        # Verify payment amount matches order.total (vnp_Amount is order.total * 100)
-        vnp_amount = request.GET.get('vnp_Amount')
-        try:
-            vnp_amount_decimal = Decimal(vnp_amount) / 100
-        except (TypeError, ValueError, InvalidOperation):
-            vnp_amount_decimal = Decimal('0')
+        with transaction.atomic():
+            order = get_object_or_404(Order.objects.select_for_update(), pk=order_id)
+            
+            # 1. Verify payment method matches
+            if order.payment_method != "vnpay":
+                messages.error(request, "Phương thức thanh toán của đơn hàng không hợp lệ.")
+                return redirect("order_detail", pk=order.pk)
+            
+            # 2. Verify payment amount matches order.total (vnp_Amount is order.total * 100)
+            vnp_amount = request.GET.get('vnp_Amount')
+            try:
+                vnp_amount_decimal = Decimal(vnp_amount) / 100
+            except (TypeError, ValueError, InvalidOperation):
+                vnp_amount_decimal = Decimal('0')
 
-        if abs(order.total - vnp_amount_decimal) > Decimal('1.00'):
-            messages.error(request, "Số tiền thanh toán không khớp với tổng tiền đơn hàng.")
-            order.payment_status = "failed"
-            order.save(update_fields=["payment_status"])
-            return redirect("order_detail", pk=order.pk)
-        
-        if response_code == "00":
-            if order.payment_status != "paid":
+            if abs(order.total - vnp_amount_decimal) > Decimal('1.00'):
+                order.payment_status = "failed"
+                order.save(update_fields=["payment_status"])
+                messages.error(request, "Số tiền thanh toán không khớp với tổng tiền đơn hàng.")
+                return redirect("order_detail", pk=order.pk)
+            
+            # 3. Check if transaction is already verified (idempotency/replay check)
+            vnp_transaction_no = request.GET.get('vnp_TransactionNo')
+            if order.payment_status == "paid":
+                messages.info(request, f"Đơn hàng #{order.pk} đã được thanh toán và xử lý trước đó.")
+                return redirect("order_detail", pk=order.pk)
+
+            # Replay protection: Check if transaction ID is already registered to another paid order
+            if vnp_transaction_no and Order.objects.filter(transaction_id=vnp_transaction_no).exclude(pk=order.pk).exists():
+                messages.error(request, "Mã giao dịch này đã được sử dụng cho một đơn hàng khác.")
+                return redirect("order_detail", pk=order.pk)
+            
+            if response_code == "00":
                 order.status = "confirmed"
                 order.payment_status = "paid"
                 order.paid_at = timezone.now()
-                order.transaction_id = request.GET.get('vnp_TransactionNo')
-                order.payment_reference = request.GET.get('vnp_BankTranNo') or request.GET.get('vnp_TransactionNo')
+                order.transaction_id = vnp_transaction_no
+                order.payment_reference = request.GET.get('vnp_BankTranNo') or vnp_transaction_no
                 order.save(update_fields=["status", "payment_status", "paid_at", "transaction_id", "payment_reference"])
                 try:
                     from ..tasks import send_order_confirmation_email_task
@@ -139,19 +158,18 @@ def vnpay_return(request):
                     pass
                 messages.success(request, f"Thanh toán VNPay thành công cho đơn hàng #{order.pk}!")
             else:
-                messages.info(request, f"Đơn hàng #{order.pk} đã được xử lý trước đó.")
-        else:
-            order.payment_status = "failed"
-            order.save(update_fields=["payment_status"])
-            messages.error(request, f"Thanh toán VNPay thất bại. Mã lỗi: {response_code}")
-            
-        return redirect("order_detail", pk=order.pk)
+                order.payment_status = "failed"
+                order.save(update_fields=["payment_status"])
+                messages.error(request, f"Thanh toán VNPay thất bại. Mã lỗi: {response_code}")
+                
+            return redirect("order_detail", pk=order.pk)
     
     messages.error(request, "Dữ liệu thanh toán không hợp lệ (Checksum failed).")
     return redirect("order_list")
 
 
 @login_required
+@require_POST
 def payment_confirm(request, pk: int):
     """View to handle payment confirmation (mock callback)."""
     order = get_object_or_404(Order, pk=pk, user=request.user)

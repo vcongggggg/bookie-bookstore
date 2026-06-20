@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import F
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -48,6 +48,7 @@ def validate_coupon_for_order(coupon_code: str, subtotal: Decimal) -> dict:
     except Coupon.DoesNotExist:
         return {"status": "error", "message": "Mã giảm giá không tồn tại."}
 
+
 def create_order_from_cart(user, shipping_address: str, note: str, coupon_code: str, payment_method: str, items: list[dict], idempotency_key: str = None) -> Order:
     """Create an order atomically, checking and locking stock, and applying a coupon if valid."""
     if not items:
@@ -59,81 +60,98 @@ def create_order_from_cart(user, shipping_address: str, note: str, coupon_code: 
             logger.info(f"Duplicate order request with idempotency_key: {idempotency_key}. Returning existing order.")
             return existing_order
 
-    with transaction.atomic():
-        # Lock books in DB to prevent race conditions during concurrent orders
-        book_ids = [row["book"].pk for row in items]
-        locked_books = {
-            book.pk: book
-            for book in Book.objects.select_for_update().filter(pk__in=book_ids)
-        }
+    try:
+        with transaction.atomic():
+            # Lock books in DB to prevent race conditions during concurrent orders
+            book_ids = [row["book"].pk for row in items]
+            locked_books = {
+                book.pk: book
+                for book in Book.objects.select_for_update().filter(pk__in=book_ids)
+            }
 
-        # Check stock sufficiency and compute subtotal
-        locked_items = []
-        for row in items:
-            book = locked_books.get(row["book"].pk)
-            if not book or row["quantity"] > book.stock:
-                raise ServiceError(f"'{row['book'].title}' không đủ hàng cho số lượng bạn chọn.")
-            locked_items.append({
-                **row,
-                "book": book,
-                "subtotal": book.price * row["quantity"]
-            })
+            # Check stock sufficiency and compute subtotal
+            locked_items = []
+            for row in items:
+                book = locked_books.get(row["book"].pk)
+                if not book or row["quantity"] > book.stock:
+                    raise ServiceError(f"'{row['book'].title}' không đủ hàng cho số lượng bạn chọn.")
+                locked_items.append({
+                    **row,
+                    "book": book,
+                    "subtotal": book.price * row["quantity"]
+                })
 
-        locked_subtotal = sum(row["subtotal"] for row in locked_items)
-        discount_amount = Decimal("0")
-        applied_coupon = None
+            locked_subtotal = sum(row["subtotal"] for row in locked_items)
+            discount_amount = Decimal("0")
+            applied_coupon = None
 
-        if coupon_code:
-            coupon_res = validate_coupon_for_order(coupon_code, locked_subtotal)
-            if coupon_res["status"] == "ok":
-                applied_coupon = coupon_res["coupon"]
-                discount_amount = coupon_res["discount"]
-            else:
-                # We don't block order completion if coupon is invalid, just warning in view
-                pass
+            if coupon_code:
+                coupon_res = validate_coupon_for_order(coupon_code, locked_subtotal)
+                if coupon_res["status"] == "ok":
+                    applied_coupon = coupon_res["coupon"]
+                    discount_amount = coupon_res["discount"]
+                else:
+                    # We don't block order completion if coupon is invalid, just warning in view
+                    pass
 
-        # Create Order
-        order = Order.objects.create(
-            user=user,
-            shipping_address=shipping_address,
-            note=note,
-            coupon=applied_coupon,
-            discount_amount=discount_amount,
-            payment_method=payment_method,
-            idempotency_key=idempotency_key,
-        )
+            # Double check idempotency_key inside transaction block to prevent race condition
+            if idempotency_key:
+                existing_order = Order.objects.filter(user=user, idempotency_key=idempotency_key).first()
+                if existing_order:
+                    logger.info(f"Duplicate order request with idempotency_key inside transaction: {idempotency_key}. Returning existing order.")
+                    return existing_order
 
-        # Create OrderItems and decrease stock
-        for row in locked_items:
-            OrderItem.objects.create(
-                order=order,
-                book=row["book"],
-                quantity=row["quantity"],
-                price=row["book"].price,
-                is_digital_purchase=False,
+            # Create Order
+            order = Order.objects.create(
+                user=user,
+                shipping_address=shipping_address,
+                note=note,
+                coupon=applied_coupon,
+                discount_amount=discount_amount,
+                payment_method=payment_method,
+                idempotency_key=idempotency_key,
             )
-            Book.objects.filter(pk=row["book"].pk).update(stock=F("stock") - row["quantity"])
 
-        # Increment coupon usage
-        if applied_coupon:
-            Coupon.objects.filter(pk=applied_coupon.pk).update(used_count=F("used_count") + 1)
+            # Create OrderItems and decrease stock
+            for row in locked_items:
+                OrderItem.objects.create(
+                    order=order,
+                    book=row["book"],
+                    quantity=row["quantity"],
+                    price=row["book"].price,
+                    is_digital_purchase=False,
+                )
+                Book.objects.filter(pk=row["book"].pk).update(stock=F("stock") - row["quantity"])
 
-        logger.info(f"Order created successfully: Order #{order.pk} by User={user.username}, Total={order.total}")
+            # Increment coupon usage
+            if applied_coupon:
+                Coupon.objects.filter(pk=applied_coupon.pk).update(used_count=F("used_count") + 1)
 
-    # Queue background emails via Huey after successful transaction commit
-    if order.payment_method == "cod":
-        send_order_confirmation_email_task(order.pk)
-    
-    # Check low stock threshold and queue warning emails
-    low_stock_ids = []
-    for row in locked_items:
-        fresh_book = Book.objects.get(pk=row["book"].pk)
-        if fresh_book.stock < 10:  # threshold is 10
-            low_stock_ids.append(fresh_book.pk)
-    if low_stock_ids:
-        send_low_stock_alert_email_task(low_stock_ids)
+            logger.info(f"Order created successfully: Order #{order.pk} by User={user.username}, Total={order.total}")
 
-    return order
+        # Queue background emails via Huey after successful transaction commit
+        if order.payment_method == "cod":
+            send_order_confirmation_email_task(order.pk)
+        
+        # Check low stock threshold and queue warning emails
+        low_stock_ids = []
+        for row in locked_items:
+            fresh_book = Book.objects.get(pk=row["book"].pk)
+            if fresh_book.stock < 10:  # threshold is 10
+                low_stock_ids.append(fresh_book.pk)
+        if low_stock_ids:
+            send_low_stock_alert_email_task(low_stock_ids)
+
+        return order
+
+    except IntegrityError as e:
+        if idempotency_key:
+            # Under high concurrency, another request succeeded first. Retrieve and return that order.
+            existing_order = Order.objects.filter(user=user, idempotency_key=idempotency_key).first()
+            if existing_order:
+                logger.warning(f"Concurrency conflict handled: idempotency_key={idempotency_key}. Returning existing order.")
+                return existing_order
+        raise ServiceError("Đơn đặt hàng bị trùng hoặc có lỗi xảy ra. Vui lòng thử lại.") from e
 
 def cancel_order_by_user(user, order_pk: int) -> Order:
     """Atomic cancellation of an order by the customer."""

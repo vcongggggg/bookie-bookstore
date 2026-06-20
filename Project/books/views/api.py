@@ -4,10 +4,24 @@ from .profile import _get_book_sentiment_summary
 
 def api_books(request):
     """REST API: list books with pagination, search, filter."""
-    page_num = request.GET.get("page", 1)
-    per_page = min(int(request.GET.get("per_page", 20)), 50)
+    try:
+        page_num = max(int(request.GET.get("page", 1)), 1)
+    except (ValueError, TypeError):
+        page_num = 1
+
+    try:
+        per_page = min(max(int(request.GET.get("per_page", 20)), 1), 50)
+    except (ValueError, TypeError):
+        per_page = 20
+
     search = request.GET.get("q", "").strip()
     category = request.GET.get("category")
+    if category:
+        try:
+            category = int(category)
+        except (ValueError, TypeError):
+            return JsonResponse({"status": "error", "message": "Mã danh mục (category) phải là số nguyên."}, status=400)
+
     sort = request.GET.get("sort", "title")
 
     qs = _books_queryset(search=search or None, category_id=category, sort=sort)
@@ -87,19 +101,34 @@ def api_cart(request):
     cart = request.session.get("cart", {})
     if request.method == "POST":
         try:
-            data = json.loads(request.body) if request.body else {}
+            try:
+                data = json.loads(request.body) if request.body else {}
+            except json.JSONDecodeError:
+                return JsonResponse({"status": "error", "message": "JSON không hợp lệ."}, status=400)
+                
             action = data.get("action")
+            if action not in ["add", "update", "remove"]:
+                return JsonResponse({"status": "error", "message": "Hành động giỏ hàng không hợp lệ."}, status=400)
+                
             book_id = str(data.get("book_id", ""))
-            
-            if action == "add":
-                qty = int(data.get("quantity", 1))
-                book = get_object_or_404(Book, pk=book_id)
-                cart[book_id] = cart.get(book_id, 0) + qty
-            elif action == "update":
-                qty = int(data.get("quantity", 1))
-                book = get_object_or_404(Book, pk=book_id)
-                if qty <= 0:
-                    cart.pop(book_id, None)
+            if not book_id:
+                return JsonResponse({"status": "error", "message": "Thiếu mã sách (book_id)."}, status=400)
+                
+            try:
+                book = Book.objects.get(pk=book_id)
+            except Book.DoesNotExist:
+                return JsonResponse({"status": "error", "message": f"Sách với ID {book_id} không tồn tại."}, status=404)
+                
+            if action in ["add", "update"]:
+                try:
+                    qty = int(data.get("quantity", 1))
+                    if qty <= 0:
+                        raise ValueError()
+                except (ValueError, TypeError):
+                    return JsonResponse({"status": "error", "message": "Số lượng phải là số nguyên dương."}, status=400)
+                    
+                if action == "add":
+                    cart[book_id] = cart.get(book_id, 0) + qty
                 else:
                     cart[book_id] = min(qty, book.stock)
             elif action == "remove":

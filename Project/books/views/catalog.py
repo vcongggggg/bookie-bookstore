@@ -331,4 +331,47 @@ def health_check(request):
     return JsonResponse(health_status, status=status_code)
 
 
+def health_live(request):
+    """Liveness probe: cheap 200 OK check without hitting DB or cache."""
+    return JsonResponse({"status": "healthy", "check": "liveness"})
+
+
+def health_ready(request):
+    """Readiness probe: verifies backend database and cache connections."""
+    from django.db import connections
+    from django.core.cache import cache
+    
+    health_status = {
+        "status": "ready",
+        "database": "untested",
+        "cache": "untested"
+    }
+    is_healthy = True
+    
+    # Check Database
+    try:
+        db_conn = connections['default']
+        db_conn.cursor()
+        health_status["database"] = "healthy"
+    except Exception as e:
+        is_healthy = False
+        health_status["database"] = f"unhealthy: {str(e)}"
+        
+    # Check Cache
+    try:
+        cache.set("health_ready_key", "alive", 10)
+        val = cache.get("health_ready_key")
+        if val == "alive":
+            health_status["cache"] = "healthy"
+        else:
+            is_healthy = False
+            health_status["cache"] = "unhealthy: mismatch value"
+    except Exception as e:
+        is_healthy = False
+        health_status["cache"] = f"unhealthy: {str(e)}"
+        
+    status_code = 200 if is_healthy else 503
+    return JsonResponse(health_status, status=status_code)
+
+
 
