@@ -211,3 +211,28 @@ def api_save_reading_progress(request, pk: int):
     progress.is_finished = finished
     progress.save(update_fields=["last_page", "is_finished", "last_read_at"])
     return JsonResponse({"status": "success"})
+
+
+def service_worker(request):
+    import os
+    from django.http import Http404
+    sw_path = os.path.join(settings.BASE_DIR, 'static', 'js', 'service-worker.js')
+    try:
+        with open(sw_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/javascript')
+    except IOError:
+        raise Http404("Service Worker not found")
+
+
+def manifest_json(request):
+    import os
+    from django.http import Http404
+    manifest_path = os.path.join(settings.BASE_DIR, 'static', 'manifest.json')
+    try:
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/json')
+    except IOError:
+        raise Http404("Manifest not found")
+
