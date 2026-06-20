@@ -16,24 +16,39 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   web:
     build: .
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+             python manage.py collectstatic --no-input &&
+             gunicorn bookstore.wsgi:application --bind 0.0.0.0:8000 --workers 3"
     volumes:
       - .:/app
     ports:
       - "8000:8000"
     environment:
+      DJANGO_SETTINGS_MODULE: bookstore.settings.production
+      DJANGO_ENV: production
+      DEBUG: "False"
       SECRET_KEY: django-insecure-dev-docker-key
-      DEBUG: "True"
-      ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0
+      ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0,web
       DB_NAME: bookstore_db
       DB_USER: bookstore
       DB_PASSWORD: bookstore
       DB_HOST: db
       DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
       OLLAMA_BASE_URL: http://host.docker.internal:11434
       OLLAMA_MODEL: qwen2.5:3b
       OLLAMA_TIMEOUT: "60"
@@ -41,6 +56,30 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: python manage.py run_huey
+    volumes:
+      - .:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: bookstore.settings.production
+      DJANGO_ENV: production
+      DEBUG: "False"
+      SECRET_KEY: django-insecure-dev-docker-key
+      DB_NAME: bookstore_db
+      DB_USER: bookstore
+      DB_PASSWORD: bookstore
+      DB_HOST: db
+      DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
 volumes:

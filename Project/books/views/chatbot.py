@@ -128,7 +128,8 @@ def _stream_chat_payload_with_history(request, stream_gen, user_message, found_b
         except json.JSONDecodeError:
             pass
 
-    bot = _build_chatbot(request)
+    import books.views
+    bot = books.views._build_chatbot(request)
     payload = {"text": clean_text, "type": "text"}
     
     # If there is a parsed action, execute it
@@ -181,7 +182,8 @@ def api_chatbot(request) -> JsonResponse:
             
         history = _get_chat_history(request)
         last_books = _get_last_books(request)
-        bot = _build_chatbot(request)
+        import books.views
+        bot = books.views._build_chatbot(request)
         response = bot.get_response(user_message, history, last_books)
         updated = _append_chat_history(
             request,
@@ -217,7 +219,8 @@ def api_chatbot_sync_unused(request) -> JsonResponse:
             return JsonResponse({"error": "No message provided"}, status=400)
             
         history = _get_chat_history(request)
-        bot = _build_chatbot(request)
+        import books.views
+        bot = books.views._build_chatbot(request)
         
         # 1. Xử lý phản hồi
         response = bot.get_response(user_message, history, None)
@@ -261,7 +264,8 @@ def api_chatbot_stream(request) -> HttpResponse:
             return JsonResponse({"error": "No message provided"}, status=400)
 
         history = _get_chat_history(request)
-        bot = _build_chatbot(request)
+        import books.views
+        bot = books.views._build_chatbot(request)
         catalog_response = bot.get_catalog_response(user_message)
         if catalog_response:
             updated = _append_chat_history(
