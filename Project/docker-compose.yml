@@ -35,6 +35,8 @@ services:
              gunicorn bookstore.wsgi:application --bind 0.0.0.0:8000 --workers 3"
     volumes:
       - .:/app
+      - staticfiles:/app/staticfiles
+      - media:/app/media
     ports:
       - "8000:8000"
     environment:
@@ -52,6 +54,10 @@ services:
       OLLAMA_BASE_URL: http://host.docker.internal:11434
       OLLAMA_MODEL: qwen2.5:3b
       OLLAMA_TIMEOUT: "60"
+      SECURE_SSL_REDIRECT: "False"
+      SESSION_COOKIE_SECURE: "False"
+      CSRF_COOKIE_SECURE: "False"
+      SECURE_HSTS_SECONDS: "0"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -65,6 +71,8 @@ services:
     command: python manage.py run_huey
     volumes:
       - .:/app
+      - staticfiles:/app/staticfiles
+      - media:/app/media
     environment:
       DJANGO_SETTINGS_MODULE: bookstore.settings.production
       DJANGO_ENV: production
@@ -84,3 +92,5 @@ services:
 
 volumes:
   postgres_data:
+  staticfiles:
+  media:

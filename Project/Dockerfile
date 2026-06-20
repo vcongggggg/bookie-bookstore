@@ -25,6 +25,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV PORT 8000
+ENV HOME /home/appuser
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -39,8 +40,10 @@ RUN pip install --no-cache-dir /wheels/*
 # Copy project files
 COPY . /app/
 
-# Create a non-privileged user and set ownership
-RUN useradd -u 8888 appuser && chown -R appuser:appuser /app
+# Create runtime directories, then hand ownership to a non-privileged user.
+RUN useradd --create-home -u 8888 appuser \
+    && mkdir -p /app/staticfiles /app/media \
+    && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
