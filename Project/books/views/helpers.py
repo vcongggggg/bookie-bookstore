@@ -168,19 +168,29 @@ def _order_books_by_ids(queryset, ids):
 
 def _get_popular_books(limit: int = 15):
     """Sách bán chạy nhất dựa trên số lượng đơn hàng."""
-    return (
-        Book.objects.annotate(total_sold=Count("order_items"))
-        .order_by("-total_sold", "title")[:limit]
-    )
+    cache_key = f"popular_books_{limit}"
+    books = cache.get(cache_key)
+    if books is None:
+        books = list(
+            Book.objects.annotate(total_sold=Count("order_items"))
+            .order_by("-total_sold", "title")[:limit]
+        )
+        cache.set(cache_key, books, 3600)
+    return books
 
 
 def _get_top_rated_books(limit: int = 15):
     """Sách được đánh giá cao nhất."""
-    return (
-        Book.objects.annotate(avg_rating=Avg("ratings__score"), rating_count=Count("ratings"))
-        .filter(rating_count__gt=0)
-        .order_by("-avg_rating", "-rating_count", "title")[:limit]
-    )
+    cache_key = f"top_rated_books_{limit}"
+    books = cache.get(cache_key)
+    if books is None:
+        books = list(
+            Book.objects.annotate(avg_rating=Avg("ratings__score"), rating_count=Count("ratings"))
+            .filter(rating_count__gt=0)
+            .order_by("-avg_rating", "-rating_count", "title")[:limit]
+        )
+        cache.set(cache_key, books, 3600)
+    return books
 
 
 def _get_recommended_for_user(user, limit: int = 8):

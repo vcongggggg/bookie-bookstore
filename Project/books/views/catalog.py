@@ -18,7 +18,10 @@ def home(request):
         recommended_books = _get_explainable_recommendations(request.user, limit=12)
     recently_viewed = _recently_viewed_books(request)
     total_books = Book.objects.count()
-    categories = Category.objects.annotate(book_count=Count("books")).order_by("name")
+    categories = cache.get("category_list_cache")
+    if categories is None:
+        categories = list(Category.objects.annotate(book_count=Count("books")).order_by("name"))
+        cache.set("category_list_cache", categories, 3600)
     
     # Get some featured reviews for section 6
     recent_reviews = Rating.objects.select_related("user", "book").order_by("-created_at")[:10]
@@ -97,7 +100,10 @@ def ebook_list(request):
 
 @ensure_csrf_cookie
 def category_list(request):
-    categories = Category.objects.annotate(book_count=Count("books")).order_by("name")
+    categories = cache.get("category_list_cache")
+    if categories is None:
+        categories = list(Category.objects.annotate(book_count=Count("books")).order_by("name"))
+        cache.set("category_list_cache", categories, 3600)
     return render(request, "books/category_list.html", {"categories": categories})
 
 

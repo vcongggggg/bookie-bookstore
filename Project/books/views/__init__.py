@@ -18,6 +18,9 @@ from .dashboard import (
     dashboard_coupon_delete, dashboard_orders, export_orders_csv,
     export_books_csv, api_update_order_status, dashboard_audit_logs
 )
-from .reader import read_book, api_save_reading_progress, _sanitize_reader_html, _split_reader_pages
+from .reader import (
+    read_book, api_save_reading_progress, _sanitize_reader_html, _split_reader_pages,
+    service_worker, manifest_json
+)
 from .chatbot import api_chatbot, api_chatbot_stream, _build_chatbot
 from .api import api_books, api_book_detail, api_stats
