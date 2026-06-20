@@ -48,10 +48,16 @@ def validate_coupon_for_order(coupon_code: str, subtotal: Decimal) -> dict:
     except Coupon.DoesNotExist:
         return {"status": "error", "message": "Mã giảm giá không tồn tại."}
 
-def create_order_from_cart(user, shipping_address: str, note: str, coupon_code: str, payment_method: str, items: list[dict]) -> Order:
+def create_order_from_cart(user, shipping_address: str, note: str, coupon_code: str, payment_method: str, items: list[dict], idempotency_key: str = None) -> Order:
     """Create an order atomically, checking and locking stock, and applying a coupon if valid."""
     if not items:
         raise ServiceError("Giỏ hàng trống.")
+
+    if idempotency_key:
+        existing_order = Order.objects.filter(user=user, idempotency_key=idempotency_key).first()
+        if existing_order:
+            logger.info(f"Duplicate order request with idempotency_key: {idempotency_key}. Returning existing order.")
+            return existing_order
 
     with transaction.atomic():
         # Lock books in DB to prevent race conditions during concurrent orders
@@ -94,6 +100,7 @@ def create_order_from_cart(user, shipping_address: str, note: str, coupon_code: 
             coupon=applied_coupon,
             discount_amount=discount_amount,
             payment_method=payment_method,
+            idempotency_key=idempotency_key,
         )
 
         # Create OrderItems and decrease stock
@@ -110,6 +117,8 @@ def create_order_from_cart(user, shipping_address: str, note: str, coupon_code: 
         # Increment coupon usage
         if applied_coupon:
             Coupon.objects.filter(pk=applied_coupon.pk).update(used_count=F("used_count") + 1)
+
+        logger.info(f"Order created successfully: Order #{order.pk} by User={user.username}, Total={order.total}")
 
     # Queue background emails via Huey after successful transaction commit
     if order.payment_method == "cod":
@@ -150,6 +159,8 @@ def cancel_order_by_user(user, order_pk: int) -> Order:
             Coupon.objects.filter(pk=order.coupon_id, used_count__gt=0).update(
                 used_count=F("used_count") - 1
             )
+
+        logger.info(f"Order cancelled by user: Order #{order.pk} by User={user.username}")
 
     # Queue background status email after transaction commits
     send_order_status_update_email_task(order.pk, old_status)

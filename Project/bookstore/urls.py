@@ -21,7 +21,7 @@ from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 
 from books.sitemaps import BookSitemap, CategorySitemap, StaticViewSitemap
-from books.views import BookieLoginView, robots_txt, service_worker, manifest_json
+from books.views import BookieLoginView, robots_txt, service_worker, manifest_json, health_check
 
 sitemaps = {
     "static": StaticViewSitemap,
@@ -31,6 +31,7 @@ sitemaps = {
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('health/', health_check, name='health_check'),
     path('robots.txt', robots_txt, name='robots_txt'),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='sitemap'),
     path('service-worker.js', service_worker, name='service_worker'),

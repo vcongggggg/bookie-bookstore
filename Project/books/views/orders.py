@@ -1,5 +1,6 @@
 from .helpers import *
 import os
+import uuid
 from django.urls import reverse
 from ..vnpay import VNPay
 from .helpers import _cart_items, _rate_limit_response, _set_cart
@@ -27,6 +28,7 @@ def checkout(request):
         form = CheckoutForm(request.POST)
         if form.is_valid():
             coupon_code = form.cleaned_data.get("coupon_code", "").strip()
+            ik = form.cleaned_data.get("idempotency_key", "").strip()
 
             if coupon_code:
                 from ..services import validate_coupon_for_order
@@ -43,6 +45,7 @@ def checkout(request):
                     coupon_code=coupon_code,
                     payment_method=form.cleaned_data["payment_method"],
                     items=items,
+                    idempotency_key=ik or None,
                 )
                 
                 _set_cart(request, {})
@@ -56,7 +59,8 @@ def checkout(request):
                 messages.error(request, str(exc))
                 return redirect("cart")
     else:
-        form = CheckoutForm()
+        ik = uuid.uuid4().hex
+        form = CheckoutForm(initial={"idempotency_key": ik})
 
     context = {
         "form": form,
@@ -107,10 +111,27 @@ def vnpay_return(request):
         response_code = request.GET.get('vnp_ResponseCode')
         order = get_object_or_404(Order, pk=order_id)
         
+        # Verify payment amount matches order.total (vnp_Amount is order.total * 100)
+        vnp_amount = request.GET.get('vnp_Amount')
+        try:
+            vnp_amount_decimal = Decimal(vnp_amount) / 100
+        except (TypeError, ValueError, InvalidOperation):
+            vnp_amount_decimal = Decimal('0')
+
+        if abs(order.total - vnp_amount_decimal) > Decimal('1.00'):
+            messages.error(request, "Số tiền thanh toán không khớp với tổng tiền đơn hàng.")
+            order.payment_status = "failed"
+            order.save(update_fields=["payment_status"])
+            return redirect("order_detail", pk=order.pk)
+        
         if response_code == "00":
-            if order.status == "pending":
+            if order.payment_status != "paid":
                 order.status = "confirmed"
-                order.save(update_fields=["status"])
+                order.payment_status = "paid"
+                order.paid_at = timezone.now()
+                order.transaction_id = request.GET.get('vnp_TransactionNo')
+                order.payment_reference = request.GET.get('vnp_BankTranNo') or request.GET.get('vnp_TransactionNo')
+                order.save(update_fields=["status", "payment_status", "paid_at", "transaction_id", "payment_reference"])
                 try:
                     from ..tasks import send_order_confirmation_email_task
                     send_order_confirmation_email_task(order.pk)
@@ -120,6 +141,8 @@ def vnpay_return(request):
             else:
                 messages.info(request, f"Đơn hàng #{order.pk} đã được xử lý trước đó.")
         else:
+            order.payment_status = "failed"
+            order.save(update_fields=["payment_status"])
             messages.error(request, f"Thanh toán VNPay thất bại. Mã lỗi: {response_code}")
             
         return redirect("order_detail", pk=order.pk)
@@ -132,9 +155,13 @@ def vnpay_return(request):
 def payment_confirm(request, pk: int):
     """View to handle payment confirmation (mock callback)."""
     order = get_object_or_404(Order, pk=pk, user=request.user)
-    if order.status == "pending":
+    if order.status == "pending" and order.payment_status != "paid":
         order.status = "confirmed"
-        order.save(update_fields=["status"])
+        order.payment_status = "paid"
+        order.paid_at = timezone.now()
+        order.transaction_id = f"MOCK-TX-{order.pk}-{uuid.uuid4().hex[:6].upper()}"
+        order.payment_reference = "MOCK-PAYMENT"
+        order.save(update_fields=["status", "payment_status", "paid_at", "transaction_id", "payment_reference"])
         try:
             from ..tasks import send_order_confirmation_email_task
             send_order_confirmation_email_task(order.pk)

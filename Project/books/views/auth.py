@@ -1,5 +1,8 @@
 from .helpers import *
 from .helpers import _client_actor, _rate_limit_response
+import logging
+
+logger = logging.getLogger("books.security")
 
 def register(request):
     if request.user.is_authenticated:
@@ -40,6 +43,7 @@ class BookieLoginView(LoginView):
         ip_actor = _client_actor(request)
         ip_lockout_key = f"login_lockout:{ip_actor}"
         if cache.get(ip_lockout_key):
+            logger.warning(f"Login attempt blocked due to IP lockout: IP={ip_actor}")
             from django.contrib.auth.forms import AuthenticationForm
             form = AuthenticationForm(request)
             form.cleaned_data = {}
@@ -52,6 +56,7 @@ class BookieLoginView(LoginView):
             if username:
                 user_lockout_key = f"login_lockout:username:{username.lower()}"
                 if cache.get(user_lockout_key):
+                    logger.warning(f"Login attempt blocked due to username lockout: Username={username}, IP={ip_actor}")
                     from django.contrib.auth.forms import AuthenticationForm
                     form = AuthenticationForm(request, data=request.POST)
                     form.cleaned_data = {}
@@ -73,9 +78,8 @@ class BookieLoginView(LoginView):
             ip_fails = 0
         ip_fails += 1
         cache.set(ip_fail_key, ip_fails, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
-        if ip_fails >= settings.LOGIN_RATE_LIMIT_FAILED_ATTEMPTS:
-            cache.set(f"login_lockout:{ip_actor}", True, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
-
+        
+        user_fails = 0
         # Increment Username failures
         if username:
             user_fail_key = f"login_failed_count:username:{username.lower()}"
@@ -85,8 +89,20 @@ class BookieLoginView(LoginView):
                 user_fails = 0
             user_fails += 1
             cache.set(user_fail_key, user_fails, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
-            if user_fails >= settings.LOGIN_RATE_LIMIT_FAILED_ATTEMPTS:
-                cache.set(f"login_lockout:username:{username.lower()}", True, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
+
+        logger.warning(
+            f"Failed login attempt: Username={username or 'N/A'}, IP={ip_actor}. "
+            f"IP Failures={ip_fails}/{settings.LOGIN_RATE_LIMIT_FAILED_ATTEMPTS}, "
+            f"User Failures={user_fails}/{settings.LOGIN_RATE_LIMIT_FAILED_ATTEMPTS}"
+        )
+
+        if ip_fails >= settings.LOGIN_RATE_LIMIT_FAILED_ATTEMPTS:
+            logger.warning(f"IP locked out: IP={ip_actor} for {settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW}s")
+            cache.set(f"login_lockout:{ip_actor}", True, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
+
+        if username and user_fails >= settings.LOGIN_RATE_LIMIT_FAILED_ATTEMPTS:
+            logger.warning(f"Username locked out: Username={username} for {settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW}s")
+            cache.set(f"login_lockout:username:{username.lower()}", True, timeout=settings.LOGIN_RATE_LIMIT_LOCKOUT_WINDOW)
 
         return super().form_invalid(form)
 
@@ -96,6 +112,8 @@ class BookieLoginView(LoginView):
         ip_actor = _client_actor(request)
         username = request.POST.get("username", "").strip()
 
+        logger.info(f"Successful login: Username={username}, IP={ip_actor}")
+
         cache.delete(f"login_failed_count:{ip_actor}")
         cache.delete(f"login_lockout:{ip_actor}")
         if username:
@@ -103,6 +121,3 @@ class BookieLoginView(LoginView):
             cache.delete(f"login_lockout:username:{username.lower()}")
 
         return super().form_valid(form)
-
-
-

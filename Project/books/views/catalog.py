@@ -292,9 +292,43 @@ _NEGATIVE_WORDS = {
     "bad", "terrible", "awful", "horrible", "boring", "waste", "poor",
     "disappointing", "worst", "hate", "slow", "confusing", "mediocre",
     "overrated", "predictable", "dull", "weak", "annoying", "frustrating",
-    "uninspired", "flat", "tedious", "unreadable", "pointless", "shallow",
-    "repetitive", "forgettable", "unimpressive", "bland", "meh",
     "tham", "nham", "that vong", "khong hay", "bof",
 }
+
+
+def health_check(request):
+    from django.db import connections
+    from django.core.cache import cache
+    
+    health_status = {
+        "status": "healthy",
+        "database": "untested",
+        "cache": "untested"
+    }
+    
+    # Check Database
+    try:
+        db_conn = connections['default']
+        db_conn.cursor()
+        health_status["database"] = "healthy"
+    except Exception as e:
+        health_status["status"] = "unhealthy"
+        health_status["database"] = f"unhealthy: {str(e)}"
+        
+    # Check Cache
+    try:
+        cache.set("health_check_key", "alive", 10)
+        val = cache.get("health_check_key")
+        if val == "alive":
+            health_status["cache"] = "healthy"
+        else:
+            health_status["cache"] = "unhealthy: mismatch value"
+    except Exception as e:
+        health_status["status"] = "unhealthy"
+        health_status["cache"] = f"unhealthy: {str(e)}"
+        
+    status_code = 200 if health_status["status"] == "healthy" else 503
+    return JsonResponse(health_status, status=status_code)
+
 
 

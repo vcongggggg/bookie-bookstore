@@ -34,6 +34,12 @@ class BookieChatbot:
         history: Sequence[ChatMessage],
         last_books: Sequence[dict[str, Any]] | None,
     ) -> dict[str, Any]:
+        if _is_prompt_injection(text):
+            return {
+                "text": "Bookie xin lỗi, yêu cầu này vi phạm chính sách an toàn thông tin của hệ thống.",
+                "type": "text"
+            }
+
         catalog_response = self.get_catalog_response(text)
         if catalog_response:
             return catalog_response
@@ -477,3 +483,23 @@ def _filter_books_by_mention(books: list[dict[str, Any]], text: str) -> list[dic
         if _title_matches(title, text):
             filtered.append(book)
     return filtered
+
+
+def _is_prompt_injection(text: str) -> bool:
+    normalized = _strip_accents(text).lower()
+    patterns = [
+        "ignore previous instructions",
+        "ignore the instructions",
+        "bypass rules",
+        "system prompt",
+        "system rules",
+        "reveal prompt",
+        "bo qua huong dan",
+        "bo qua quy tac",
+        "tiet lo prompt",
+        "tiet lo huong dan",
+        "he lo prompt",
+        "override prompt",
+        "jailbreak"
+    ]
+    return any(p in normalized for p in patterns)

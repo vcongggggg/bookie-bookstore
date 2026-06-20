@@ -1,131 +1,122 @@
-# Bookie — Midnight Cosmic Library ✦
+# Bookie — Midnight Cosmic Bookstore ✦
 
-**Bookie** là hệ thống thương mại điện tử bán sách hiện đại, được tái định nghĩa với trải nghiệm **Midnight Cosmic** (Vũ trụ nửa đêm). Website tích hợp Trí tuệ nhân tạo (AI) để cá nhân hóa hành trình đọc sách, phân tích cảm xúc và mang đến một giao diện điện ảnh, cao cấp.
+[![Django CI](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/django-tests.yml/badge.svg)](https://github.com/vcongggggg/bookie-bookstore/actions)
+[![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
----
-
-## 1. Tầm nhìn dự án (Phase 3: Midnight Cosmic Redesign)
-
-Dự án đã trải qua đợt lột xác toàn diện về UI/UX để chuyển mình từ một nhà sách trực tuyến thông thường thành một **Thư viện số cao cấp**:
-- **Branding:** Tên thương hiệu mới **Bookie** với Logo tối giản phong cách Gold-on-Dark.
-- **Aesthetic:** Concept "Midnight Cosmic" sử dụng dải màu Aurora Mesh, các hạt tinh thể chuyển động và hiệu ứng kính mờ (Glassmorphism).
-- **Technology:** Tích hợp **GSAP (GreenSock)** cho các hiệu ứng cuộn trang mượt mà và ScrollTriggers sinh động.
+**Bookie** is a production-oriented, full-stack bookstore platform designed with robust software engineering patterns. Moving beyond simple CRUD capabilities, it includes features focused on concurrency safety, offline reading, logging audit trails, structured security controls, background worker execution, and automated testing suites.
 
 ---
 
-## 2. Các tính năng đột phá (Core Features)
+## 1. Project Overview & Features
 
-### 2.1 Trải nghiệm người dùng (UX Design)
-- **Bento Grid Categories:** Hệ thống danh mục được sắp xếp theo bố cục Bento hiện đại, sử dụng hình ảnh minh họa 3D phong cách Abstract chuyên sâu.
-- **Infinite Cosmic Ticker:** Thanh chạy thông tin vô tận (Looping Marquee) ở Header, cung cấp các thông tin khuyến mãi và tính năng AI theo thời gian thực.
-- **AI Showcase:** Khu vực giới thiệu công nghệ AI với các thẻ tính năng (Content-based Filtering, Sentiment Analysis, Reading DNA) được thiết kế với Background AI-generated 3D nghệ thuật.
-- **Cinematic Book Cards:** Thẻ sách 3D với hiệu ứng Glare (phản chiếu ánh sáng) và tương tác vật lý khi di chuột.
+### Core E-Commerce Workflows
+- **Cosmic Catalog & Filtering:** Search, sort, and filter books using AJAX-driven queries and Bento grid category layouts.
+- **AJAX Shopping Cart & Concurrency-Safe Checkout:** Interactive cart management, dynamic coupon code validations, and an order creation flow guarded by database-level row locks.
+- **Ebook Reader (PWA):** Fluid e-reader supporting offline reading (via service workers), bookmark saving, progress synchronizations, and responsive layouts.
+- **Admin Dashboard (RBAC):** High-level management panel with distinct views, actions, and credentials mapped across 5 Roles: Customer, Staff, Manager, Support, and Admin.
 
-### 2.2 Trí tuệ nhân tạo (AI Engine)
-- **Content-based Filtering:** Gợi ý sách thông minh dựa trên "Dấu vân tay sở thích" của người dùng.
-- **Sentiment Analysis:** Phân tích cảm xúc nhận xét tự động (Tích cực/Tiêu cực) để xếp hạng chất lượng sách.
-- **Reading DNA:** Bản đồ hóa nhóm tính cách đọc sách (Explorer, Scholar, Critic...) qua đồ thị trực quan.
-- **Bookie Chatbot:** Trợ lý ảo AI có khả năng kéo thả, hỗ trợ giải đáp và tìm kiếm sách 24/7.
-
-### 2.3 Hệ thống nghiệp vụ chuyên nghiệp
-- **Thanh toán QR:** Hệ thống Mock Payment tích hợp tạo mã QR động cho Momo/VNPay.
-- **Dashboard Admin:** Quản lý doanh thu, đơn hàng và kho sách qua các biểu đồ trực quan (Chart.js).
-- **Real-time Interaction:** Toàn bộ hành động Thêm vào giỏ/Yêu thích đều sử dụng AJAX không tải lại trang.
+### Advanced AI Integrations
+- **AI Recommendation Engine:** Content-based filtering matching user interests with book attributes, and sentiment analysis on reviews.
+- **DB-Grounded Book Assistant:** Draggable chatbot utilizing Ollama (Qwen) with catalog search prioritizing database lookups before generating fallback answers, guarded against prompt injection.
 
 ---
 
-## 3. Stack Công nghệ (Technology Stack)
+## 2. Technology Stack
 
-| Thành phần | Công nghệ |
+| Layer | Technologies |
 | :--- | :--- |
-| **Core Backend** | Django 6.1 (Python 3.12) |
-| **Frontend Foundation** | HTML5, Vanilla JS (ES6+), CSS3 Variables |
-| **Animation Engine** | **GSAP (GreenSock)** + ScrollTrigger |
-| **AI Backend** | **Ollama** (Model: **Qwen 2.5 7B**) |
-| **Database** | **MySQL** (Vận hành thực tế), SQLite3 (Development) |
-| **Payment Gateway** | **VNPay** (Tích hợp thực tế), Mock Payment |
+| **Backend Framework** | Django 6.1 (Python 3.12), Django ORM |
+| **Frontend UI** | HTML5, CSS3 Variables, ES6+ Javascript, AJAX, GSAP (Animations) |
+| **Databases & Cache** | PostgreSQL (Production), SQLite (Dev), Redis (Cache & Tasks Broker) |
+| **Background Tasks** | Huey (Sqlite/Redis Backend) |
+| **Containerization** | Docker, Multi-Stage builds (Non-root user) |
+| **Quality & SecOps** | Django TestCase, Playwright (E2E), pip-audit, bandit, Coverage (fail-under 65%) |
 
 ---
 
-## 4. Hướng dẫn cài đặt & Cấu hình Production
+## 3. Architecture & Production Features
 
-### 1. FILE CẤU HÌNH .ENV (Bắt buộc)
-Tạo file `.env` tại thư mục gốc và cấu hình như sau:
+### Concurrency & Transaction Integrity
+During checkout, the system uses Django's `select_for_update()` to lock Book inventory rows within an atomic transaction. This prevents stock double-allocations and race conditions during high concurrent order volumes.
 
-```env
-# Django Settings
-SECRET_KEY=your-secret-key
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
+### Task Queue & Asynchronous Workloads
+Rather than blocking HTTP requests, the application delegates CPU-bound or external network operations to a background **Huey** task queue:
+- Generating and mailing order confirmation PDFs.
+- Triggering admin alerts for inventory dip warnings (low stock alerts).
+- Mailing user welcomes on registrations.
 
-# Database MySQL
-DB_NAME=smart_bookstore
-DB_USER=root
-DB_PASSWORD=your-password
-DB_HOST=127.0.0.1
-DB_PORT=3306
+### Redis Cache & Invalidation Signals
+High-traffic pages (homepage lists, category directories) query Redis cache before making database roundtrips. Custom model signals (`post_save`, `post_delete`) automatically evict corresponding cache keys upon Book, Category, Rating, or Order modifications.
 
-# AI / Ollama Settings
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b
+### PWA Offline Support
+Uses a custom Service Worker served from the root scope (`/service-worker.js`) to provide true **offline ebook reading**. App Shell assets and loaded ebook pages are cached using a *Network-First* fallback strategy.
 
-# VNPay Settings
-VNP_TMN_CODE=your-tmn-code
-VNP_HASH_KEY=your-hash-key
-VNP_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-```
-
-### 2. CÀI ĐẶT THƯ VIỆN
-```bash
-pip install django python-dotenv mysqlclient requests
-```
-
-### 3. KIẾN TRÚC CHATBOT MỚI
-Chatbot Bookie đã được nâng cấp lên kiến trúc **RAG (Retrieval-Augmented Generation)**:
-- **Streaming Response:** Hiển thị câu trả lời ngay lập tức theo thời gian thực (giống ChatGPT).
-- **Database Access:** AI có khả năng tra cứu hơn 400 đầu sách trong kho dữ liệu thực tế để gợi ý chính xác cho khách hàng.
+### Observability & Liveness Health Checks
+Includes a JSON health check endpoint (`/health/`) monitoring system dependencies (PostgreSQL database and Redis cache). This is compatible with container orchestrators (Docker Compose health checks or Kubernetes liveness probes).
 
 ---
 
-## 5. Thông tin thực hiện
+## 4. Security & Hardening Controls
 
-- **Dự án:** Bookie — Midnight Cosmic Bookstore
-- **Nhóm thực hiện:** Nhóm 13 (PBL Python)
-- **Trạng thái:** Hoàn thiện 100% (Gold Master Version)
+- **Authentication Lockout:** Brute-force protection locking out IPs and user accounts after 5 failed login attempts within a 15-minute sliding window.
+- **Security Headers:** Strict implementation of security policies, including `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and secure cookie bindings (`SESSION_COOKIE_HTTPONLY`, `SESSION_COOKIE_SECURE`).
+- **Input Sanitization:** Custom HTMLParser sanitizes ebook HTML inputs, discarding script/style blocks to protect against XSS injections.
+- **Secure payment lifecycles:** VNPay webhook/IPN signature verifications and payment amount checking to mitigate price tampering.
+- **Idempotency Key Protection:** Checkout forms contain hidden UUID idempotency keys to ensure resubmitted requests do not create duplicate orders or deduct inventory twice.
+- **CI/CD Quality Gates:** GitHub Actions automatically audit dependencies for known CVEs (`pip-audit`) and scan source code for security anti-patterns (`bandit`) on every push.
 
 ---
-*Giao diện Bookie được tối ưu hóa cho trải nghiệm cao cấp trên trình duyệt hiện đại.*
 
----
+## 5. Local Quick Start
 
-## 6. Hướng dẫn cài đặt
+To spin up the entire multi-container environment (Django + PostgreSQL + Redis + Huey worker):
 
 ```bash
-# 1. Cài đặt thư viện
-pip install django
+# 1. Clone the repository
+git clone https://github.com/vcongggggg/bookie-bookstore.git
+cd bookie-bookstore/Project
 
-# 2. Khởi tạo Database
-python manage.py makemigrations
-python manage.py migrate
+# 2. Configure Environment Variables
+cp .env.example .env
+# Open .env and customize database / cache keys as needed
 
-# 3. Seed dữ liệu thực tế (Hàng chục đầu sách từ Open Library)
-python manage.py seed_books --limit 50
+# 3. Spin up services via Docker Compose
+docker compose up --build -d
 
-# 4. Tạo quản trị viên
-python manage.py createsuperuser
+# 4. Migrate database schemas and seed realistic demo data
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py seed_fake_data --reset-demo
+```
 
-# 5. Khởi chạy
-python manage.py runserver
+Access the system at `http://127.0.0.1:8000/`.
+
+---
+
+## 6. Testing & Quality Gates
+
+The test suite validates both API functionality, role accessibility (RBAC), and security controls.
+
+To run tests locally:
+```bash
+# Run unit test suite
+python manage.py test books
+
+# Run test suite with coverage report
+coverage run --source=Project/books --omit="*/migrations/*,*/tests.py" Project/manage.py test books
+coverage report --fail-under=65
 ```
 
 ---
 
-## 7. Thông tin nhóm thực hiện
+## 7. Demo Credentials
 
-- **Đề tài:** Website gợi ý sản phẩm thông minh (Smart Bookstore)
-- **Môn học:** Lập trình Python
-- **Nhóm:** 13
-- **Tính năng đặc biệt:** Mock Payment, Draggable AI Chatbot, Reading DNA, Sentiment Analysis.
+The database seeding command creates representative users for all roles:
 
----
-*Dự án hoàn thiện 100% các yêu cầu về nghiệp vụ và tích hợp công nghệ AI.*
+| Username | Password | Primary Role | Permissions |
+| :--- | :--- | :--- | :--- |
+| `demo` | `demo123` | Customer | Order books, read online, edit profile |
+| `admin` | `admin123` | Admin | Access dashboard, view audit logs, adjust settings |
+| `manager` | `manager123` | Manager | Manage books, categories, and inventory |
+| `staff` | `staff123` | Staff | Access dashboard overview, export reports |
+| `support` | `support123` | Support | View and update customer order statuses |

@@ -45,6 +45,7 @@ class ProfileEditForm(forms.ModelForm):
 
 
 class CheckoutForm(forms.Form):
+    idempotency_key = forms.CharField(widget=forms.HiddenInput(), required=False)
     shipping_address = forms.CharField(
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Nhập địa chỉ giao hàng..."}),
         label="Địa chỉ giao hàng",

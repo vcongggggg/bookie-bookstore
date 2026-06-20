@@ -1,6 +1,6 @@
 from .catalog import (
     home, book_list, ebook_list, book_detail, category_list, category_detail, 
-    about, contact, robots_txt, rate_book, api_search
+    about, contact, robots_txt, rate_book, api_search, health_check
 )
 from .auth import register, BookieLoginView
 from .cart import cart_view, add_to_cart, update_cart, remove_from_cart, api_apply_coupon
@@ -23,4 +23,8 @@ from .reader import (
     service_worker, manifest_json
 )
 from .chatbot import api_chatbot, api_chatbot_stream, _build_chatbot
-from .api import api_books, api_book_detail, api_stats
+from .api import (
+    api_books, api_book_detail, api_stats,
+    api_cart, api_orders, api_order_detail, api_profile
+)
+

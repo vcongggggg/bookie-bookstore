@@ -4,185 +4,30 @@
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-6.x-092E20?logo=django&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-47%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-70%20passing-brightgreen)
 
-Bookie is a Django bookstore project with a full e-commerce workflow, admin dashboard, AI-assisted book discovery features, and test/CI support. The active application lives in [`Project/`](Project/).
+Bookie is a Django bookstore project featuring full e-commerce workflows, an admin dashboard, an offline PWA ebook reader, background tasks, Redis caching, and robust security controls. 
 
-## Highlights
+The primary, production-ready implementation resides in the [`Project/`](Project/) directory. For a comprehensive overview of the design patterns, system architecture, security controls, and local quick start, please refer directly to the detailed [**Project/README.md**](Project/README.md).
 
-- Full bookstore flow: catalog, category filter/search, book detail, cart, checkout, coupons, orders, wishlist, ratings, user profile, reading history, and ebook reader.
-- Admin workflows: user management, book/coupon/order management, revenue statistics, audit logs, CSV export, and role-based permissions.
-- AI-assisted features: content-based recommendations, sentiment analysis, Reading DNA, and a database-grounded chatbot.
-- Quality baseline: Django checks, automated tests, GitHub Actions workflow, CSRF-protected chatbot API, AJAX cart/wishlist tests, sitemap/robots.txt, and JSON-LD Book SEO.
-- Local and Docker-ready workflows with seed commands and environment templates.
+## Project Features at a Glance
 
-## Security Highlights
+- **Complete E-Commerce Flow:** Catalog search/sorting, category filters, interactive cart, coupon discounts, order placement, wishlist, ratings, and user profiles.
+- **PWA Ebook Reader:** Serves a custom Service Worker at the root scope, supporting offline ebook reading, bookmarking, and visual progress tracking.
+- **Operations & Caching:** Redis caching for popular lists, model signals for automatic cache invalidation, and background task queues utilizing Huey (email confirmation, low-stock warnings).
+- **Security & Hardening:** Brute-force protection (lockout by IP and username), database transaction row locking (`select_for_update`) to prevent double stock reduction, API rate limits, secure cookies, HTML sanitization against XSS, and signature validation on VNPay callbacks.
+- **Observability:** Custom health check endpoint (`/health/`) monitoring PostgreSQL and Redis backend liveness, and structured application logs.
+- **Quality Gate CI/CD:** Pipeline runs tests, enforces a 65% coverage gate (currently at 67%), scans python dependencies (`pip-audit`), and audits codebase security (`bandit`).
 
-- **Brute-Force Protection:** Enforces soft account lockouts (IP and username) after **5 failed login attempts** for 15 minutes.
-- **Race Condition Prevention:** Combines Django database transactions with `select_for_update()` locking to prevent stock and coupon overdrafts.
-- **Shared API Rate Limiting:** Enforces request thresholds on high-traffic or sensitive endpoints (Registration, Coupon Apply, Chatbot, and Checkout).
-- **IDOR Protection:** Implements rigorous checks on profiles, orders, and PDF invoice downloads to verify resource ownership.
-- **CSRF & HTTP Hardening:** Ensures all state-changing endpoints reject GET requests, require CSRF tokens, and secure cookies are configured for TLS.
-- **HTML Sanitization:** Cleans digital book content to prevent XSS.
-
-## Demo Status
-
-- Live demo: not deployed yet
-- Demo video: planned
-- Screenshots: planned
-- Local demo accounts after running `seed_fake_data --reset-demo`:
-  - Customer: `demo / demo123`
-  - Admin: `admin / admin123`
-
-## My Contribution
-
-- Built the full bookstore functionality across user-facing pages, admin workflows, cart/order flows, and AI-assisted features.
-- Implemented dashboard and management screens for books, users, coupons, orders, revenue, and audit logs.
-- Added tests and quality gates for the main web flows.
-- Improved project setup so the application can be run locally or through Docker.
-
-## Tech Stack
-
-- Backend: Python, Django
-- Database: SQLite for local development, PostgreSQL Docker support, MySQL-style production configuration
-- Frontend: HTML, CSS, JavaScript, Bootstrap, Chart.js, GSAP, AJAX
-- AI: Ollama/Qwen, recommendation logic, sentiment analysis, database-grounded chatbot behavior
-- Dev tooling: Docker, Docker Compose, GitHub Actions
-
-## Architecture
-
-```text
-Browser
-  |
-  v
-Django Views + Templates
-  |
-  +-- Book catalog / cart / checkout / orders
-  +-- Admin dashboard / RBAC / audit logs
-  +-- Ebook reader / reading progress
-  +-- AI assistant / recommendations / sentiment
-  |
-  v
-SQLite (local) / PostgreSQL (Docker) / MySQL-style production config
-  |
-  +-- Optional Ollama/Qwen local LLM for chatbot responses
-```
-
-## Repository Structure
-
-```text
-.
-|-- Project/
-|   |-- books/            # Main Django app
-|   |-- bookstore/        # Django settings and URL configuration
-|   |-- templates/        # HTML templates
-|   |-- static/           # CSS, JavaScript, images
-|   |-- Dockerfile
-|   |-- docker-compose.yml
-|   |-- manage.py
-|   `-- requirements.txt
-|-- CODEBASE_CONTEXT.md
-|-- PROJECT_STATUS_AND_TEST_PLAN.md
-`-- README.md
-```
-
-## Core Features
-
-### User Features
-
-- Register, login, logout, and profile management.
-- Browse catalog, filter/search by category, and view book details.
-- Add books to cart/wishlist and complete checkout.
-- Apply coupons and view order history/details.
-- Rate/comment books.
-- Read ebooks online and track reading progress.
-
-### Admin Features
-
-- Admin dashboard for revenue, orders, users, and books.
-- Manage users, books, coupons, and orders.
-- Export books/orders to CSV.
-- Audit administrative actions.
-- Role-based access for management screens.
-
-### AI Features
-
-- Content-based recommendation logic.
-- Sentiment analysis for reviews/comments.
-- Reading DNA visualization.
-- Chatbot that searches the book database first before using a local LLM response.
-
-## Run Locally
-
-```powershell
-cd Project
-copy .env.example .env
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py seed_fake_data --reset-demo
-python manage.py runserver
-```
-
-Open:
-
-- App: http://127.0.0.1:8000
-- Admin: http://127.0.0.1:8000/admin/
-
-Demo accounts:
-
-```text
-Customer: demo / demo123
-Admin:    admin / admin123
-```
-
-## Run Tests
-
-From the repository root:
-
-```powershell
-python Project\manage.py check
-python Project\manage.py test books
-```
+## Run Tests Locally
 
 From `Project/`:
-
-```powershell
+```bash
 python manage.py check
 python manage.py test books
 ```
 
-Current baseline: `56 tests passing`.
+Current baseline: `70 tests passing`.
 
-## Run with Docker
-
-```powershell
-cd Project
-docker compose up --build
-docker compose exec web python manage.py seed_fake_data --reset-demo
-```
-
-## Deployment Plan
-
-This project is ready to be deployed as a portfolio demo. A typical setup would use:
-
-- Render, Railway, Fly.io, or PythonAnywhere for the Django app
-- PostgreSQL for the production-like database
-- Environment variables from `Project/.env.example`
-- Django's standard `collectstatic` flow for static files
-
-Suggested post-deploy smoke test:
-
-- Open the home/catalog page.
-- Login with a demo account.
-- Add a book to cart and wishlist.
-- Complete checkout with seeded data.
-- Open the admin dashboard.
-- Run chatbot/database book search.
-
-## Notes
-
-- Do not commit `.env`, local databases, generated media, virtual environments, or cache files.
-- Use `.env.example` as the safe configuration template.
-- This is an academic/personal portfolio project, not a production bookstore.
+---
+*For installation instructions, docker usage, and demo credentials, see [Project/README.md](Project/README.md).*

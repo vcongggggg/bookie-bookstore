@@ -109,9 +109,20 @@ class Order(models.Model):
         ("delivered", "Đã giao"),
         ("cancelled", "Đã hủy"),
     ]
+    PAYMENT_STATUS_CHOICES = [
+        ("pending", "Chờ thanh toán"),
+        ("paid", "Đã thanh toán"),
+        ("failed", "Thanh toán thất bại"),
+        ("refunded", "Đã hoàn tiền"),
+    ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     payment_method = models.CharField(max_length=20, default="cod", choices=[("cod", "COD"), ("vnpay", "VNPay"), ("momo", "Momo")])
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default="pending")
+    paid_at = models.DateTimeField(null=True, blank=True)
+    transaction_id = models.CharField(max_length=100, blank=True, null=True)
+    payment_reference = models.CharField(max_length=100, blank=True, null=True)
+    idempotency_key = models.CharField(max_length=100, blank=True, null=True, unique=True)
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     note = models.TextField(blank=True, help_text="Ghi chú đơn hàng")

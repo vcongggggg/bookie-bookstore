@@ -61,6 +61,10 @@ urlpatterns = [
     path("api/v1/books/", views.api_books, name="api_books"),
     path("api/v1/books/<int:pk>/", views.api_book_detail, name="api_book_detail"),
     path("api/v1/stats/", views.api_stats, name="api_stats"),
+    path("api/v1/cart/", views.api_cart, name="api_cart"),
+    path("api/v1/orders/", views.api_orders, name="api_orders"),
+    path("api/v1/orders/<int:pk>/", views.api_order_detail, name="api_order_detail"),
+    path("api/v1/profile/", views.api_profile, name="api_profile"),
     path("api/v1/chatbot/", views.api_chatbot, name="api_chatbot"),
     path("api/v1/chatbot/stream/", views.api_chatbot_stream, name="api_chatbot_stream"),
 ]
