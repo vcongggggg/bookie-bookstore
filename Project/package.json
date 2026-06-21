@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test e2e/bookie-ui.spec.js",
+    "screenshots": "node scripts/run-screenshots.js",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report"
   },

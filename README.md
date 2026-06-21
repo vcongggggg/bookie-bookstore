@@ -1,6 +1,6 @@
 # Bookie - Django E-commerce Bookstore
 
-[![Django Tests](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/django-tests.yml/badge.svg)](https://github.com/vcongggggg/bookie-bookstore/actions)
+[![Bookie CI](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/ci.yml/badge.svg)](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-6.x-092E20?logo=django&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
@@ -19,6 +19,18 @@ The active implementation lives in [`Project/`](Project/). The old root-level Dj
 - **AI assistant:** database-grounded chatbot/recommendation behavior with prompt-injection guardrails.
 - **Operations:** Docker Compose with Django, PostgreSQL, Redis, Huey worker, Gunicorn, WhiteNoise, health probes, and structured logs.
 - **Quality gates:** Django tests, Playwright baseline, `pip-audit`, `bandit`, and coverage checks.
+
+## Screenshots
+
+| Home | Catalog |
+| :---: | :---: |
+| ![Bookie home](docs/screenshots/desktop-01-home.png) | ![Bookie catalog](docs/screenshots/desktop-02-catalog.png) |
+
+| Checkout | Dashboard |
+| :---: | :---: |
+| ![Bookie checkout](docs/screenshots/desktop-05-checkout.png) | ![Bookie dashboard](docs/screenshots/desktop-08-dashboard.png) |
+
+More screenshots are available in [docs/screenshots](docs/screenshots/).
 
 ## Documentation
 
@@ -41,9 +53,11 @@ Latest local verification in this branch:
 cd Project
 python manage.py check
 python manage.py test books.tests.EnterpriseCVUpgradeTests
+npm.cmd run test:e2e:smoke -- --project=chromium-mobile
+npm.cmd run screenshots
 ```
 
-Current baseline: `75+ backend tests passing` in the full `books` suite before this phase; final full verification is tracked in Phase 6.
+Current baseline: `75+ backend tests passing`, Playwright smoke coverage for public pages, cart/checkout, COD checkout, Momo mock payment, RBAC dashboard, health probes, reader, and chatbot. Final full verification is tracked in Phase 6.
 
 ## Run Locally
 

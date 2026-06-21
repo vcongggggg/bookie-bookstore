@@ -1,6 +1,6 @@
 # Bookie - Production-Oriented Django Bookstore
 
-[![Django CI](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/django-tests.yml/badge.svg)](https://github.com/vcongggggg/bookie-bookstore/actions)
+[![Bookie CI](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/ci.yml/badge.svg)](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/django-6.x-092E20.svg)](https://www.djangoproject.com/)
 [![Tests](https://img.shields.io/badge/tests-75%2B%20passing-brightgreen.svg)](../TESTING.md)
@@ -91,10 +91,11 @@ Open `http://127.0.0.1:8000/`.
 ```powershell
 python manage.py check
 python manage.py test books
-npm.cmd run test:e2e
+npm.cmd run test:e2e:smoke
+npm.cmd run screenshots
 ```
 
-Current verified baseline: `75+ backend tests passing`; final full verification is tracked in the root upgrade plan.
+Current verified baseline: `75+ backend tests passing` plus Playwright smoke flows for public pages, cart/checkout, COD checkout, simulated Momo payment, RBAC dashboard access, health probes, reader, and chatbot.
 
 ## 6. Demo Credentials
 

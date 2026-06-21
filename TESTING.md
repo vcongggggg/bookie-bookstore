@@ -1,91 +1,99 @@
 # Bookie Testing Workflow
 
-This project uses a practical web-project testing workflow: every change should pass automated checks, and risky user flows should also be tested manually in the browser.
+Bookie uses layered tests so risky flows are checked at the backend, browser, and CI levels.
 
-## Quality Gates
+## Local Quality Gates
 
-Before merging into `main`, run:
+From the repository root:
 
 ```powershell
 python Project\manage.py check
 python Project\manage.py test books
-coverage run Project\manage.py test books
-coverage report
+cd Project
+npm.cmd run test:e2e:smoke
+npm.cmd run screenshots
+docker compose config --quiet
 ```
 
-GitHub Actions also runs:
+Coverage gate:
 
-- dependency install from `Project/requirements.txt`
-- `python Project/manage.py check`
-- `coverage run Project/manage.py test books`
-- `coverage report --fail-under=35`
+```powershell
+cd Project
+coverage run --source=books --omit="*/migrations/*,*/tests.py,*/test_*.py" manage.py test books
+coverage report --fail-under=65
+```
+
+## GitHub Actions
+
+The canonical workflow is `.github/workflows/ci.yml`.
+
+It runs:
+
+- Backend: `python manage.py check`, Django tests, coverage `fail-under=65`.
+- Security: `pip-audit`, `bandit`, and `.env.example` secret-pattern check.
+- E2E: Playwright smoke suite for desktop and mobile Chromium.
+- Docker: `docker compose config --quiet` and `docker compose build web worker`.
+
+Playwright artifacts are uploaded on failure from `Project/playwright-report` and `Project/test-results`.
+
+## Current Automated Coverage
+
+Backend tests cover:
+
+- Home, catalog, and book detail smoke behavior.
+- Reader access and reading-progress save.
+- Digital and physical checkout behavior.
+- Coupon validation and fallback behavior.
+- Checkout idempotency and stock locking.
+- Payment confirmation method restrictions.
+- VNPay return validation and replay safety.
+- API method/input validation.
+- Order/profile API access control.
+- Login lockout, rate limiting, IDOR checks, and RBAC.
+- Health probes.
+- Chatbot prompt-injection guardrails.
+
+Playwright smoke tests cover:
+
+- Public pages without horizontal overflow.
+- Demo login.
+- Add to cart, cart view, checkout view.
+- COD checkout to order detail.
+- Simulated Momo payment to paid order state.
+- Customer dashboard rejection.
+- Admin dashboard access.
+- Support order dashboard access.
+- Liveness/readiness health JSON.
+- Reader layout.
+- Chatbot mocked response.
+
+Screenshot automation captures portfolio images into `docs/screenshots/`.
 
 ## Branch Workflow
 
 1. Start from updated `main`.
-2. Create a focused branch:
-   - `feature/<name>` for new features
-   - `fix/<name>` for bugs
-   - `hardening/<name>` for quality/UX cleanup
-   - `testing/<name>` for test infrastructure
-   - `docs/<name>` for documentation
-3. Add or update tests for the touched behavior.
-4. Run local checks.
+2. Create a focused branch: `feature/<name>`, `fix/<name>`, `hardening/<name>`, `testing/<name>`, or `docs/<name>`.
+3. Add or update tests for touched behavior.
+4. Run the relevant local quality gates.
 5. Commit with a clear message.
-6. Push branch.
-7. Merge into `main` only after tests pass.
-8. Re-run checks on `main`, then push `main`.
+6. Push branch and wait for CI.
+7. Merge only after tests/security checks pass.
 
-## Test Pyramid For This Project
+## Manual Demo Checklist
 
-- Model/unit tests: model properties such as order totals, coupon validity, stock behavior.
-- View/integration tests: URLs, permissions, checkout, reader, dashboard, chatbot API.
-- Manual browser tests: layout, AJAX interactions, mobile behavior, payment redirects, visual quality.
-- External-service smoke tests: Ollama and VNPay only when local/sandbox services are configured.
+Use this before recording a demo video or sharing a public deploy:
 
-## Current Automated Coverage
-
-The Django test suite currently covers:
-
-- home and book detail smoke tests
-- reader access and reading-progress save
-- paid digital preview/full access behavior
-- digital checkout stock behavior
-- physical checkout stock behavior
-- coupon discount checkout behavior
-- invalid coupon checkout fallback behavior
-- dashboard URL reverse checks
-- Reading DNA chart context
-- invoice PDF access and response type
-- chatbot rate limiting
-
-## Manual Regression Checklist
-
-Use `PROJECT_STATUS_AND_TEST_PLAN.md` for a full browser checklist.
-
-Minimum manual smoke pass before demo:
-
-1. Browse catalog and book detail.
+1. Browse home, catalog, and book detail.
 2. Add/remove/update cart items.
 3. Checkout with COD.
-4. Apply valid and invalid coupons.
-5. View order detail and download invoice PDF.
+4. Checkout with simulated Momo payment.
+5. View order detail and invoice PDF.
 6. Add/remove wishlist item.
 7. Open Reading DNA as demo user.
 8. Open digital reader and save progress.
-9. Open chatbot and verify fallback/rate-limit behavior.
-10. Open dashboard as staff/admin and verify key pages.
+9. Open chatbot and verify a catalog-grounded response.
+10. Open dashboard as Admin and Support.
 
 ## When To Add Tests
 
-Add tests whenever a change touches:
-
-- checkout or payment
-- cart or stock handling
-- permissions/authentication
-- admin actions
-- reader access/progress
-- user-generated content
-- chatbot/API behavior
-- templates that depend on non-trivial context
-
+Add tests whenever a change touches checkout/payment, cart/stock handling, permissions, admin actions, reader access/progress, user-generated content, chatbot/API behavior, or templates with non-trivial context.

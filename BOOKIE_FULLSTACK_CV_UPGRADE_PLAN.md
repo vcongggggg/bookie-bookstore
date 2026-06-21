@@ -9,7 +9,8 @@ Muc tieu cua file nay: bien Bookie tu mot project bookstore co nhieu tinh nang t
 - Security docs da duoc sync lai de noi dung khop code: VNPay hien la return handler, khong phai server-to-server IPN/webhook.
 - README root va `Project/README.md` da chuyen sang repo canonical `vcongggggg/bookie-bookstore` va test badge `75+`.
 - Da tao `docs/screenshots/README.md` va `DEMO_SCRIPT.md`.
-- Viec con lai agent tiep tuc lam: asset/SRI, Playwright e2e, screenshot automation, CI consolidation, full local/Docker verification.
+- Da hop nhat CI vao `.github/workflows/ci.yml` voi backend, security, Playwright smoke, va Docker validation jobs.
+- Viec con lai agent tiep tuc lam: full local/Docker verification, final CV bullets, deploy public/video demo neu co tai khoan va platform.
 
 ## 0. Cach dung file nay
 
@@ -114,7 +115,7 @@ Acceptance criteria:
 ### 3.2 Screenshots
 
 - [x] `P0` Tao folder `docs/screenshots/`.
-- [ ] `P0` Chup it nhat 8 anh:
+- [x] `P0` Chup it nhat 8 anh:
   - Home/catalog.
   - Book detail.
   - Cart.
@@ -124,8 +125,8 @@ Acceptance criteria:
   - Dashboard orders/books/users.
   - Ebook reader.
   - Chatbot.
-- [ ] `P1` Chup mobile screenshot cho catalog/checkout/reader.
-- [ ] `P1` Nen dat ten file ro: `01-home.png`, `02-book-detail.png`, ...
+- [x] `P1` Chup mobile screenshot cho catalog/checkout/reader.
+- [x] `P1` Nen dat ten file ro: `01-home.png`, `02-book-detail.png`, ...
 
 Acceptance criteria:
 
@@ -511,21 +512,21 @@ Muc tieu: test khong chi nhieu, ma bao phu flow quan trong.
 
 ### 9.2 E2E tests
 
-- [ ] `P0` Playwright smoke:
+- [x] `P0` Playwright smoke:
   - home load.
   - login demo.
   - add to cart.
   - checkout COD.
-- [ ] `P1` E2E dashboard role:
+- [x] `P1` E2E dashboard role:
   - admin can access.
   - customer cannot access.
   - support can update order.
   - manager can manage books.
-- [ ] `P1` E2E responsive:
+- [x] `P1` E2E responsive:
   - mobile catalog.
   - mobile checkout.
   - mobile reader.
-- [ ] `P1` Screenshot tests cho reader/dashboard.
+- [x] `P1` Screenshot tests cho reader/dashboard.
 
 ### 9.3 CI/CD
 
@@ -850,6 +851,6 @@ Neu can tang diem nhanh nhat:
 | Observability         |    [x] |       P1 | Health, logs, audit         |
 | API layer             |    [x] |       P1 | API endpoints, API.md       |
 | Security review       |    [x] |       P1 | SECURITY_REVIEW.md          |
-| E2E/responsive        |    [ ] |       P1 | Playwright coverage         |
+| E2E/responsive        |    [x] |       P1 | Playwright coverage         |
 | Performance/cache     |    [ ] |       P2 | Query/cache notes           |
 | AI polish             |    [x] |       P2 | Guardrails, eval cases      |

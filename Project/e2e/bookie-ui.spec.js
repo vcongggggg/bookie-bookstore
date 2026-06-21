@@ -55,6 +55,29 @@ async function loginAsDemo(page) {
   await loginAs(page, 'demo', 'demo123');
 }
 
+async function addFirstAvailableBookToCart(page) {
+  await page.goto('/books/');
+  const firstAddButton = page.locator('.ajax-add-cart').first();
+  await expect(firstAddButton).toBeVisible();
+  await firstAddButton.click();
+  await expect(page.locator('#cart-badge')).toHaveText(/[1-9]\d*/);
+}
+
+async function submitCheckout(page, { paymentMethod = 'cod', address = '12 Nguyen Trai, Da Nang' } = {}) {
+  await page.goto('/checkout/');
+  await expect(page.locator('#checkout-form')).toBeVisible();
+  await page.locator(`#pay_${paymentMethod}`).check();
+  await page.locator('textarea[name="shipping_address"]').fill(address);
+  await expectNoHorizontalOverflow(page);
+  await page.locator('button[form="checkout-form"]:visible, #checkout-form button[type="submit"]:visible').first().click();
+}
+
+function extractOrderIdFromUrl(url) {
+  const match = url.match(/\/orders\/(\d+)\//);
+  if (!match) throw new Error(`Could not extract order id from URL: ${url}`);
+  return match[1];
+}
+
 test.describe('Bookie UI smoke tests', () => {
   test('public pages render cleanly without horizontal overflow', async ({ page }) => {
     const diagnostics = attachUiDiagnostics(page);
@@ -94,6 +117,53 @@ test.describe('Bookie UI smoke tests', () => {
     diagnostics.assertClean();
   });
 
+  test('demo user can complete COD checkout and view order detail', async ({ page }) => {
+    const diagnostics = attachUiDiagnostics(page);
+
+    await loginAsDemo(page);
+    await addFirstAvailableBookToCart(page);
+    await submitCheckout(page, { paymentMethod: 'cod' });
+
+    await expect(page).toHaveURL(/\/orders\/\d+\/$/);
+    const orderId = extractOrderIdFromUrl(page.url());
+    await expect(page.locator('body')).toContainText(`#${orderId}`);
+    await expectNoHorizontalOverflow(page);
+
+    const response = await page.request.get(`/api/v1/orders/${orderId}/`);
+    expect(response.ok()).toBeTruthy();
+    const order = await response.json();
+    expect(order.payment_method).toBe('cod');
+    expect(order.payment_status).not.toBe('paid');
+
+    diagnostics.assertClean();
+  });
+
+  test('demo user can complete simulated Momo payment flow', async ({ page }) => {
+    const diagnostics = attachUiDiagnostics(page);
+
+    await loginAsDemo(page);
+    await addFirstAvailableBookToCart(page);
+    await submitCheckout(page, { paymentMethod: 'momo', address: '34 Bach Dang, Da Nang' });
+
+    await expect(page).toHaveURL(/\/orders\/\d+\/payment\/$/);
+    await expect(page.locator('body')).toContainText('Simulated Momo payment');
+    await expect(page.locator('img[src*="/static/img/payments/qr-momo-mock.svg"]')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await page.locator('form[action*="/payment/confirm/"] button[type="submit"]').click();
+    await expect(page).toHaveURL(/\/orders\/\d+\/$/);
+
+    const orderId = extractOrderIdFromUrl(page.url());
+    const response = await page.request.get(`/api/v1/orders/${orderId}/`);
+    expect(response.ok()).toBeTruthy();
+    const order = await response.json();
+    expect(order.payment_method).toBe('momo');
+    expect(order.payment_status).toBe('paid');
+    expect(order.transaction_id).toMatch(/^MOCK-MOMO-/);
+
+    diagnostics.assertClean();
+  });
+
   test('dashboard and reader layouts avoid horizontal overflow', async ({ page }) => {
     const diagnostics = attachUiDiagnostics(page);
 
@@ -111,6 +181,41 @@ test.describe('Bookie UI smoke tests', () => {
     await expectNoHorizontalOverflow(page);
 
     diagnostics.assertClean();
+  });
+
+  test('dashboard RBAC allows staff roles and rejects customers', async ({ page }) => {
+    const diagnostics = attachUiDiagnostics(page);
+
+    await loginAsDemo(page);
+    await page.goto('/dashboard/');
+    await expect(page).toHaveURL(/\/admin\/login\/\?next=\/dashboard\//);
+
+    await page.context().clearCookies();
+    await loginAs(page, 'admin', 'admin123');
+    await page.goto('/dashboard/');
+    await expect(page).toHaveURL(/\/dashboard\/$/);
+    await expect(page.locator('body')).toContainText('Dashboard');
+
+    await page.context().clearCookies();
+    await loginAs(page, 'support', 'support123');
+    await page.goto('/dashboard/orders/');
+    await expect(page).toHaveURL(/\/dashboard\/orders\/$/);
+    await expect(page.locator('table')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    diagnostics.assertClean();
+  });
+
+  test('health probes return expected JSON', async ({ request }) => {
+    const live = await request.get('/health/live/');
+    expect(live.ok()).toBeTruthy();
+    await expect(live).toBeOK();
+    expect(await live.json()).toMatchObject({ status: 'healthy', check: 'liveness' });
+
+    const ready = await request.get('/health/ready/');
+    expect(ready.ok()).toBeTruthy();
+    await expect(ready).toBeOK();
+    expect(await ready.json()).toMatchObject({ status: 'ready' });
   });
 
   test('chat widget opens and renders a mocked bot reply', async ({ page }) => {
