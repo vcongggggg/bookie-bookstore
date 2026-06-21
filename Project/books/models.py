@@ -133,6 +133,15 @@ class Order(models.Model):
     def __str__(self) -> str:
         return f"Order #{self.pk} by {self.user}"
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["transaction_id"],
+                condition=models.Q(transaction_id__isnull=False) & ~models.Q(transaction_id=""),
+                name="uniq_order_transaction_id_not_blank",
+            )
+        ]
+
     @property
     def subtotal(self):
         return sum(item.price * item.quantity for item in self.items.all())

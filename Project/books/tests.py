@@ -6,6 +6,7 @@ from unittest.mock import patch
 import requests
 from django.core.cache import cache
 from django.core.management import call_command
+from django.db import IntegrityError, transaction
 from django.test import TestCase, Client
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -1019,19 +1020,39 @@ class EnterpriseCVUpgradeTests(TestCase):
         self.assertEqual(response.json()["status"], "ready")
 
     def test_payment_confirm_requires_post(self):
-        """Verify that payment_confirm view strictly rejects GET requests."""
-        order = Order.objects.create(user=self.user, shipping_address="Test Address", payment_method="cod")
+        """Verify that payment_confirm only allows POST for Momo mock payments."""
+        cod_order = Order.objects.create(user=self.user, shipping_address="Test Address", payment_method="cod")
+        vnpay_order = Order.objects.create(user=self.user, shipping_address="Test Address", payment_method="vnpay")
+        momo_order = Order.objects.create(user=self.user, shipping_address="Test Address", payment_method="momo")
         self.client.force_login(self.user)
 
         # GET request must fail with 405
-        response = self.client.get(reverse("payment_confirm", args=[order.pk]))
+        response = self.client.get(reverse("payment_confirm", args=[momo_order.pk]))
         self.assertEqual(response.status_code, 405)
 
-        # POST request must succeed
-        response = self.client.post(reverse("payment_confirm", args=[order.pk]))
+        # COD and VNPay must not be manually marked paid through the mock endpoint
+        response = self.client.post(reverse("payment_confirm", args=[cod_order.pk]))
+        self.assertEqual(response.status_code, 400)
+        cod_order.refresh_from_db()
+        self.assertNotEqual(cod_order.payment_status, "paid")
+
+        response = self.client.post(reverse("payment_confirm", args=[vnpay_order.pk]))
+        self.assertEqual(response.status_code, 400)
+        vnpay_order.refresh_from_db()
+        self.assertNotEqual(vnpay_order.payment_status, "paid")
+
+        # Momo mock payment may be confirmed exactly once
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(reverse("payment_confirm", args=[momo_order.pk]))
         self.assertEqual(response.status_code, 302)
-        order.refresh_from_db()
-        self.assertEqual(order.payment_status, "paid")
+        momo_order.refresh_from_db()
+        self.assertEqual(momo_order.payment_status, "paid")
+        self.assertTrue(momo_order.transaction_id.startswith("MOCK-MOMO-"))
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            response = self.client.post(reverse("payment_confirm", args=[momo_order.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(callbacks), 0)
 
     def test_vnpay_return_hardened_checks(self):
         """Verify that vnpay_return validates payment method and checks replay transaction ID."""
@@ -1044,19 +1065,31 @@ class EnterpriseCVUpgradeTests(TestCase):
             # Attempt to confirm payment with mismatched method (COD order)
             response = self.client.get(
                 reverse("vnpay_return"),
-                {"vnp_TxnRef": order.pk, "vnp_ResponseCode": "00", "vnp_Amount": "20000"}
+                {"vnp_TxnRef": order.pk, "vnp_ResponseCode": "00", "vnp_Amount": "20000", "vnp_TransactionNo": "TX-COD"}
             )
             self.assertEqual(response.status_code, 302)
             order.refresh_from_db()
             self.assertNotEqual(order.payment_status, "paid")
 
+            # Missing required transaction id should not mark a VNPay order paid
+            missing_param_order = Order.objects.create(user=self.user, payment_method="vnpay")
+            OrderItem.objects.create(order=missing_param_order, book=self.book, quantity=1, price=200.0)
+            response = self.client.get(
+                reverse("vnpay_return"),
+                {"vnp_TxnRef": missing_param_order.pk, "vnp_ResponseCode": "00", "vnp_Amount": "20000"}
+            )
+            self.assertEqual(response.status_code, 302)
+            missing_param_order.refresh_from_db()
+            self.assertNotEqual(missing_param_order.payment_status, "paid")
+
             # Correct payment method (VNPay order)
             order2 = Order.objects.create(user=self.user, payment_method="vnpay")
             OrderItem.objects.create(order=order2, book=self.book, quantity=1, price=200.0)
-            response = self.client.get(
-                reverse("vnpay_return"),
-                {"vnp_TxnRef": order2.pk, "vnp_ResponseCode": "00", "vnp_Amount": "20000", "vnp_TransactionNo": "TX-123456"}
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.get(
+                    reverse("vnpay_return"),
+                    {"vnp_TxnRef": order2.pk, "vnp_ResponseCode": "00", "vnp_Amount": "20000", "vnp_TransactionNo": "TX-123456"}
+                )
             self.assertEqual(response.status_code, 302)
             order2.refresh_from_db()
             self.assertEqual(order2.payment_status, "paid")
@@ -1072,6 +1105,13 @@ class EnterpriseCVUpgradeTests(TestCase):
             self.assertEqual(response.status_code, 302)
             order3.refresh_from_db()
             self.assertNotEqual(order3.payment_status, "paid")
+
+    def test_transaction_id_database_constraint_blocks_duplicates(self):
+        """Verify transaction replay is protected by the database constraint too."""
+        Order.objects.create(user=self.user, payment_method="vnpay", transaction_id="DB-TX-1")
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Order.objects.create(user=self.user, payment_method="vnpay", transaction_id="DB-TX-1")
 
     def test_api_books_parameter_safeguards(self):
         """Verify that api_books handles non-integer pagination and invalid categories gracefully."""

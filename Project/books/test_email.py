@@ -140,13 +140,13 @@ class EmailIntegrationTestCase(TestCase):
         self.assertTrue(has_low_stock)
         self.assertTrue(has_order_confirm)
 
-    def test_payment_confirm_sends_email_for_online_payment(self):
-        """Test that confirming an online payment triggers order confirmation email."""
+    def test_payment_confirm_sends_email_for_momo_mock_payment(self):
+        """Test that confirming a Momo mock payment triggers order confirmation email."""
         order = Order.objects.create(
             user=self.user,
             shipping_address="123 Street",
             status="pending",
-            payment_method="vnpay"
+            payment_method="momo"
         )
         OrderItem.objects.create(
             order=order,
@@ -156,7 +156,8 @@ class EmailIntegrationTestCase(TestCase):
         )
         
         self.client.login(username="testuser", password="password123")
-        response = self.client.post(reverse("payment_confirm", args=[order.pk]))
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(reverse("payment_confirm", args=[order.pk]))
         self.assertEqual(response.status_code, 302)
         
         self.assertEqual(len(mail.outbox), 1)

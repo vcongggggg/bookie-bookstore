@@ -153,6 +153,56 @@ def create_order_from_cart(user, shipping_address: str, note: str, coupon_code: 
                 return existing_order
         raise ServiceError("Đơn đặt hàng bị trùng hoặc có lỗi xảy ra. Vui lòng thử lại.") from e
 
+
+def mark_order_paid(
+    order: Order,
+    *,
+    transaction_id: str,
+    payment_reference: str = "",
+    source: str = "payment",
+    send_email: bool = True,
+) -> tuple[Order, bool]:
+    """Transition an order to paid exactly once.
+
+    The caller should pass a row-locked order when handling external callbacks.
+    Returns (order, changed), where changed is False for already-paid replays.
+    """
+    transaction_id = (transaction_id or "").strip()
+    payment_reference = (payment_reference or transaction_id).strip()
+
+    if order.payment_status == "paid":
+        logger.info("Payment replay ignored: order=%s source=%s", order.pk, source)
+        return order, False
+
+    if order.status != "pending":
+        logger.warning("Payment rejected for non-pending order: order=%s status=%s source=%s", order.pk, order.status, source)
+        raise ServiceError("Order is not pending payment.")
+
+    if not transaction_id:
+        logger.warning("Payment rejected because transaction_id is missing: order=%s source=%s", order.pk, source)
+        raise ServiceError("Payment transaction id is required.")
+
+    if Order.objects.filter(transaction_id=transaction_id).exclude(pk=order.pk).exists():
+        logger.warning("Payment replay rejected: transaction_id=%s order=%s source=%s", transaction_id, order.pk, source)
+        raise ServiceError("Payment transaction id has already been used.")
+
+    order.status = "confirmed"
+    order.payment_status = "paid"
+    order.paid_at = timezone.now()
+    order.transaction_id = transaction_id
+    order.payment_reference = payment_reference
+
+    try:
+        order.save(update_fields=["status", "payment_status", "paid_at", "transaction_id", "payment_reference"])
+    except IntegrityError as exc:
+        logger.warning("Payment replay rejected by database constraint: transaction_id=%s order=%s source=%s", transaction_id, order.pk, source)
+        raise ServiceError("Payment transaction id has already been used.") from exc
+
+    logger.info("Payment marked paid: order=%s transaction_id=%s source=%s", order.pk, transaction_id, source)
+    if send_email:
+        transaction.on_commit(lambda: send_order_confirmation_email_task(order.pk))
+    return order, True
+
 def cancel_order_by_user(user, order_pk: int) -> Order:
     """Atomic cancellation of an order by the customer."""
     with transaction.atomic():
