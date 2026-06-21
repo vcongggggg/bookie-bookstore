@@ -1,7 +1,9 @@
 from .helpers import *
 from .helpers import _books_queryset, _cart_items
 from .profile import _get_book_sentiment_summary
+from django.views.decorators.http import require_GET, require_http_methods
 
+@require_GET
 def api_books(request):
     """REST API: list books with pagination, search, filter."""
     try:
@@ -52,6 +54,7 @@ def api_books(request):
     })
 
 
+@require_GET
 def api_book_detail(request, pk: int):
     """REST API: single book detail."""
     book = get_object_or_404(Book, pk=pk)
@@ -75,6 +78,7 @@ def api_book_detail(request, pk: int):
     })
 
 
+@require_GET
 def api_stats(request):
     """REST API: public stats."""
     total_books = Book.objects.count()
@@ -94,8 +98,8 @@ def api_stats(request):
 # ═══════════════════════════════════════════════════════════════════
 import json
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
 
+@require_http_methods(["GET", "POST"])
 def api_cart(request):
     """REST API: get cart (GET) or update cart items (POST)."""
     cart = request.session.get("cart", {})
@@ -127,10 +131,18 @@ def api_cart(request):
                 except (ValueError, TypeError):
                     return JsonResponse({"status": "error", "message": "Số lượng phải là số nguyên dương."}, status=400)
                     
+                if book.stock <= 0:
+                    return JsonResponse({"status": "error", "message": "Sách đã hết hàng."}, status=400)
+
                 if action == "add":
-                    cart[book_id] = cart.get(book_id, 0) + qty
+                    current_qty = int(cart.get(book_id, 0))
+                    if current_qty + qty > book.stock:
+                        return JsonResponse({"status": "error", "message": "Số lượng vượt quá tồn kho hiện tại."}, status=400)
+                    cart[book_id] = current_qty + qty
                 else:
-                    cart[book_id] = min(qty, book.stock)
+                    if qty > book.stock:
+                        return JsonResponse({"status": "error", "message": "Số lượng vượt quá tồn kho hiện tại."}, status=400)
+                    cart[book_id] = qty
             elif action == "remove":
                 cart.pop(book_id, None)
             
@@ -158,6 +170,7 @@ def api_cart(request):
 
 
 @login_required
+@require_GET
 def api_orders(request):
     """REST API: list all orders of the authenticated user."""
     orders = request.user.orders.all().order_by("-created_at")
@@ -177,6 +190,7 @@ def api_orders(request):
 
 
 @login_required
+@require_GET
 def api_order_detail(request, pk: int):
     """REST API: order details with owner-only access validation."""
     order = get_object_or_404(Order, pk=pk)
@@ -213,6 +227,7 @@ def api_order_detail(request, pk: int):
 
 
 @login_required
+@require_GET
 def api_profile(request):
     """REST API: current user profile details with primary RBAC role."""
     from ..rbac import primary_role

@@ -989,12 +989,18 @@ class EnterpriseCVUpgradeTests(TestCase):
         self.assertEqual(data["username"], "apiuser")
         self.assertEqual(data["primary_role"], "Customer")
 
+        response = self.client.post(reverse("api_profile"))
+        self.assertEqual(response.status_code, 405)
+
         # Orders API
         Order.objects.create(user=self.user, shipping_address="Test address")
         response = self.client.get(reverse("api_orders"))
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data["orders"]), 1)
+
+        response = self.client.post(reverse("api_orders"))
+        self.assertEqual(response.status_code, 405)
 
     def test_chatbot_prompt_injection_guardrail(self):
         """Verify that the chatbot blocks prompt injection attempts."""
@@ -1120,12 +1126,22 @@ class EnterpriseCVUpgradeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["current_page"], 1)
 
+        response = self.client.post(reverse("api_books"))
+        self.assertEqual(response.status_code, 405)
+
         # Invalid non-integer category ID must return 400 Bad Request
         response = self.client.get(reverse("api_books"), {"category": "invalid"})
         self.assertEqual(response.status_code, 400)
 
     def test_api_cart_input_checks(self):
         """Verify api_cart handles invalid requests, actions, and non-existing books."""
+        response = self.client.put(
+            reverse("api_cart"),
+            data=json.dumps({"action": "add", "book_id": self.book.pk, "quantity": 1}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 405)
+
         # POST invalid JSON format
         response = self.client.post(
             reverse("api_cart"),
@@ -1158,4 +1174,40 @@ class EnterpriseCVUpgradeTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+        # POST quantity beyond stock
+        response = self.client.post(
+            reverse("api_cart"),
+            data=json.dumps({"action": "add", "book_id": self.book.pk, "quantity": self.book.stock + 1}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # POST adding on top of an existing cart quantity beyond stock
+        session = self.client.session
+        session["cart"] = {str(self.book.pk): self.book.stock}
+        session.save()
+        response = self.client.post(
+            reverse("api_cart"),
+            data=json.dumps({"action": "add", "book_id": self.book.pk, "quantity": 1}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # POST update quantity beyond stock
+        response = self.client.post(
+            reverse("api_cart"),
+            data=json.dumps({"action": "update", "book_id": self.book.pk, "quantity": self.book.stock + 1}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # POST add out-of-stock book
+        self.book.stock = 0
+        self.book.save(update_fields=["stock"])
+        response = self.client.post(
+            reverse("api_cart"),
+            data=json.dumps({"action": "add", "book_id": self.book.pk, "quantity": 1}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 400)
 

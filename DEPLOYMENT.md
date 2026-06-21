@@ -54,7 +54,28 @@ To spin up all services including Django, PostgreSQL, Redis, and the Huey backgr
 
 ---
 
-## 3. Production Environment Variables Checklist
+## 3. Health Probes
+
+Bookie exposes three operational health endpoints:
+
+| Endpoint | Purpose | Dependency Checks |
+| :--- | :--- | :--- |
+| `/health/` | Full application health summary for manual checks. | Database and cache. |
+| `/health/live/` | Liveness probe: confirms the Django process can answer HTTP. | None. |
+| `/health/ready/` | Readiness probe: confirms the app can safely receive traffic. | Database and cache. |
+
+Suggested usage:
+
+```bash
+curl http://127.0.0.1:8000/health/live/
+curl http://127.0.0.1:8000/health/ready/
+```
+
+Use `/health/live/` for container liveness checks and `/health/ready/` for load balancer or platform readiness checks.
+
+---
+
+## 4. Production Environment Variables Checklist
 
 Ensure the following variables are correctly configured in production hosting environments (e.g., Render, Railway, Fly.io, or VPS) to enforce security locks:
 
@@ -73,7 +94,7 @@ Ensure the following variables are correctly configured in production hosting en
 
 ---
 
-## 4. Production Deployment Methods
+## 5. Production Deployment Methods
 
 ### A. Render (PaaS)
 1. **Database:** Provision a PostgreSQL Instance on Render. Copy the Database connection URL.
@@ -81,7 +102,7 @@ Ensure the following variables are correctly configured in production hosting en
 3. **Web Service:** Create a new Web Service pointing to your repository.
    * **Build Command:** `pip install -r requirements.txt && python manage.py collectstatic --no-input`
    * **Start Command:** `gunicorn bookstore.wsgi:application --bind 0.0.0.0:$PORT`
-   * **Environment Variables:** Define all variables from Section 3.
+   * **Environment Variables:** Define all variables from Section 4.
 4. **Worker Service:** Create a new Private Service on Render.
    * **Build Command:** `pip install -r requirements.txt`
    * **Start Command:** `python manage.py run_huey`

@@ -52,8 +52,14 @@ High-traffic pages (homepage lists, category directories) query Redis cache befo
 ### PWA Offline Support
 Uses a custom Service Worker served from the root scope (`/service-worker.js`) to provide true **offline ebook reading**. App Shell assets and loaded ebook pages are cached using a *Network-First* fallback strategy.
 
-### Observability & Liveness Health Checks
-Includes a JSON health check endpoint (`/health/`) monitoring system dependencies (PostgreSQL database and Redis cache). This is compatible with container orchestrators (Docker Compose health checks or Kubernetes liveness probes).
+### Observability & Health Checks
+Includes JSON health endpoints for local verification and container orchestration:
+
+| Endpoint | Purpose |
+| :--- | :--- |
+| `/health/` | Full application health summary with database/cache checks. |
+| `/health/live/` | Liveness probe that only confirms the Django process is answering. |
+| `/health/ready/` | Readiness probe that verifies database/cache dependencies before receiving traffic. |
 
 ---
 

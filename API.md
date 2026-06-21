@@ -1,28 +1,63 @@
 # Bookie JSON API Reference
 
-This document describes the JSON REST-like API endpoints exposed by Bookie. These endpoints allow client-side application flows or external services to interact with books, carts, orders, and user profiles.
+This document describes the JSON REST-like API exposed by Bookie for catalog browsing, cart operations, order lookup, profile lookup, and operational health checks.
 
 ## Base URL
-All API paths are relative to the root URL (e.g., `http://localhost:8000`).
+
+Local development base URL: `http://localhost:8000`
+
+Versioned API base path: `/api/v1`
+
+## Response Conventions
+
+Successful responses keep the endpoint-specific payload shape shown below.
+
+Error responses use this minimal shape:
+
+```json
+{
+  "status": "error",
+  "message": "Human-readable error message"
+}
+```
+
+Common status codes:
+
+| Status | Meaning |
+| :--- | :--- |
+| `200 OK` | Request succeeded. |
+| `302 Found` | Session-authenticated endpoint redirected an anonymous user to login. |
+| `400 Bad Request` | Invalid input, invalid action, invalid JSON, invalid category, or stock validation failure. |
+| `403 Forbidden` | Authenticated user is not allowed to access the requested resource. |
+| `404 Not Found` | Resource does not exist. |
+| `405 Method Not Allowed` | Endpoint does not support the HTTP method. |
 
 ---
 
-## 1. Catalog & Books
+## Catalog
 
 ### List Books
-Retrieve a paginated list of books, with support for search, category filtering, and sorting.
 
-* **URL:** `/api/books/`
-* **Method:** `GET`
-* **Authentication Required:** No
-* **Query Parameters:**
-  * `page` (integer, default: `1`): The page number to retrieve.
-  * `per_page` (integer, default: `20`, max: `50`): Number of books per page.
-  * `q` (string): Search query matching book titles or authors.
-  * `category` (integer): ID of the category to filter by.
-  * `sort` (string, default: `title`): Sorting criteria. Prefix with `-` for descending (e.g. `-price`, `price`, `title`).
+Returns a paginated list of books with optional search, category filtering, and sorting.
 
-* **Response Example (200 OK):**
+| Field | Value |
+| :--- | :--- |
+| URL | `/api/v1/books/` |
+| Method | `GET` |
+| Auth | Public |
+
+Query parameters:
+
+| Parameter | Type | Notes |
+| :--- | :--- | :--- |
+| `page` | integer | Defaults to `1`; invalid values safely fall back to `1`. |
+| `per_page` | integer | Defaults to `20`; capped at `50`. |
+| `q` | string | Searches book title/author. |
+| `category` | integer | Category ID. Non-integer values return `400`. |
+| `sort` | string | Supports existing catalog sort keys, for example `title`, `price`, `-price`. |
+
+Response example:
+
 ```json
 {
   "count": 39,
@@ -39,30 +74,32 @@ Retrieve a paginated list of books, with support for search, category filtering,
       "stock": 15,
       "in_stock": true,
       "cover_image": "/media/covers/midnight_stars.jpg",
-      "description": "An epic cosmic journey exploring the depths of the universe...",
+      "description": "An epic cosmic journey...",
       "url": "/books/1/"
     }
   ]
 }
 ```
 
----
-
 ### Book Detail
-Retrieve detailed information for a single book, including average rating and AI review sentiment.
 
-* **URL:** `/api/books/<int:pk>/`
-* **Method:** `GET`
-* **Authentication Required:** No
+Returns detailed information for one book, including rating aggregates and sentiment summary.
 
-* **Response Example (200 OK):**
+| Field | Value |
+| :--- | :--- |
+| URL | `/api/v1/books/<id>/` |
+| Method | `GET` |
+| Auth | Public |
+
+Response example:
+
 ```json
 {
   "id": 1,
   "title": "Midnight Stars",
   "author": "A. Asteroid",
   "price": 125000.0,
-  "description": "An epic cosmic journey exploring the depths of the universe...",
+  "description": "An epic cosmic journey...",
   "category": "Sci-Fi",
   "published_year": 2024,
   "num_pages": 320,
@@ -72,23 +109,25 @@ Retrieve detailed information for a single book, including average rating and AI
   "avg_rating": 4.5,
   "rating_count": 12,
   "sentiment": {
-    "summary": "Highly recommended for fans of hard sci-fi. Readers appreciate the pacing.",
+    "summary": "Readers respond positively to the pacing.",
     "polarity": "Positive",
     "score": 0.85
   }
 }
 ```
 
----
+### Stats
 
-### Global Stats
-Retrieve public summary metrics of the bookstore.
+Returns public bookstore metrics.
 
-* **URL:** `/api/stats/`
-* **Method:** `GET`
-* **Authentication Required:** No
+| Field | Value |
+| :--- | :--- |
+| URL | `/api/v1/stats/` |
+| Method | `GET` |
+| Auth | Public |
 
-* **Response Example (200 OK):**
+Response example:
+
 ```json
 {
   "total_books": 39,
@@ -100,19 +139,20 @@ Retrieve public summary metrics of the bookstore.
 
 ---
 
-## 2. Shopping Cart
+## Cart
 
-### View or Update Cart
-Retrieve current session-based cart items or perform state operations (add, update, remove items).
+### View Cart
 
-* **URL:** `/api/cart/`
-* **Method:** `GET` | `POST`
-* **Authentication Required:** No (uses session cookies)
+Returns the current session cart.
 
-#### GET Request
-Retrieves the list of books currently in the user's cart.
+| Field | Value |
+| :--- | :--- |
+| URL | `/api/v1/cart/` |
+| Method | `GET` |
+| Auth | Public session cookie |
 
-* **Response Example (200 OK):**
+Response example:
+
 ```json
 {
   "cart_items": [
@@ -129,16 +169,33 @@ Retrieves the list of books currently in the user's cart.
 }
 ```
 
-#### POST Request
-Modifies items in the cart. Requires a JSON payload.
+### Update Cart
 
-* **Headers:** `Content-Type: application/json`, `X-CSRFToken: <token>`
-* **Payload Fields:**
-  * `action` (string, required): Choice of `"add"`, `"update"`, or `"remove"`.
-  * `book_id` (integer/string, required): The ID of the book.
-  * `quantity` (integer, optional): The quantity to add or update (defaults to `1` for add).
+Adds, updates, or removes a cart item.
 
-* **Payload Example (Add):**
+| Field | Value |
+| :--- | :--- |
+| URL | `/api/v1/cart/` |
+| Method | `POST` |
+| Auth | Public session cookie plus CSRF token |
+
+Headers:
+
+```text
+Content-Type: application/json
+X-CSRFToken: <token>
+```
+
+Payload fields:
+
+| Field | Type | Notes |
+| :--- | :--- | :--- |
+| `action` | string | Required. One of `add`, `update`, `remove`. |
+| `book_id` | integer/string | Required. |
+| `quantity` | integer | Required for `update`, optional for `add` with default `1`. Must be positive. |
+
+Add example:
+
 ```json
 {
   "action": "add",
@@ -147,78 +204,79 @@ Modifies items in the cart. Requires a JSON payload.
 }
 ```
 
-* **Payload Example (Update):**
-```json
-{
-  "action": "update",
-  "book_id": 1,
-  "quantity": 3
-}
-```
+Stock validation:
 
-* **Payload Example (Remove):**
-```json
-{
-  "action": "remove",
-  "book_id": 1
-}
-```
+- Adding an out-of-stock book returns `400`.
+- Adding a quantity that would make the session cart exceed current stock returns `400`.
+- Updating a quantity beyond current stock returns `400`.
 
-* **Response Example (200 OK):** Returns the updated cart payload matching the GET response format.
+Success response returns the same shape as `GET /api/v1/cart/`.
 
 ---
 
-## 3. Orders & Profile
+## Orders And Profile
 
-### List User Orders
-Retrieve a chronological list of orders associated with the authenticated user.
+### List Orders
 
-* **URL:** `/api/orders/`
-* **Method:** `GET`
-* **Authentication Required:** Yes (via session/cookie)
+Returns orders owned by the authenticated user.
 
-* **Response Example (200 OK):**
+| Field | Value |
+| :--- | :--- |
+| URL | `/api/v1/orders/` |
+| Method | `GET` |
+| Auth | Required |
+
+Response example:
+
 ```json
 {
   "orders": [
     {
       "id": 10,
       "status": "pending",
-      "status_vi": "Chờ thanh toán",
+      "status_vi": "Awaiting payment",
       "payment_method": "vnpay",
-      "payment_status": "unpaid",
+      "payment_status": "pending",
       "total": 350000.0,
-      "created_at": "2026-06-20T10:15:30Z"
+      "created_at": "2026-06-20T10:15:30+00:00"
     }
   ]
 }
 ```
 
----
+### Order Detail
 
-### Order Details
-Retrieve itemized contents and payment metadata of a specific order. Owners and staff users only.
+Returns one order with itemized contents. Owners and staff users can access the resource.
 
-* **URL:** `/api/orders/<int:pk>/`
-* **Method:** `GET`
-* **Authentication Required:** Yes (Owner-only or Staff-only verification)
+| Field | Value |
+| :--- | :--- |
+| URL | `/api/v1/orders/<id>/` |
+| Method | `GET` |
+| Auth | Required |
 
-* **Response Example (200 OK):**
+Authorization rule:
+
+- Owner: allowed.
+- Staff: allowed.
+- Other authenticated users: `403`.
+
+Response example:
+
 ```json
 {
   "id": 10,
   "status": "paid",
-  "status_vi": "Đã thanh toán",
+  "status_vi": "Paid",
   "payment_method": "vnpay",
   "payment_status": "paid",
-  "paid_at": "2026-06-20T10:17:12Z",
+  "paid_at": "2026-06-20T10:17:12+00:00",
   "transaction_id": "VNP12345678",
   "discount_amount": 0.0,
   "subtotal": 350000.0,
   "total": 350000.0,
-  "shipping_address": "123 Cosmic Way, Hanoi",
+  "shipping_address": "123 Cosmic Way, Da Nang",
   "note": "Deliver in the evening",
-  "created_at": "2026-06-20T10:15:30Z",
+  "created_at": "2026-06-20T10:15:30+00:00",
   "items": [
     {
       "book_id": 1,
@@ -226,44 +284,45 @@ Retrieve itemized contents and payment metadata of a specific order. Owners and 
       "quantity": 2,
       "price": 125000.0,
       "subtotal": 250000.0
-    },
-    {
-      "book_id": 5,
-      "title": "Cosmic Nebulae",
-      "quantity": 1,
-      "price": 100000.0,
-      "subtotal": 100000.0
     }
   ]
 }
 ```
 
-* **Error Example (403 Forbidden):**
-```json
-{
-  "status": "error",
-  "message": "Bạn không có quyền xem đơn hàng này."
-}
-```
+### Profile
 
----
+Returns the authenticated user's profile and primary RBAC role.
 
-### User Profile
-Retrieve profile data and RBAC permissions for the currently authenticated user.
+| Field | Value |
+| :--- | :--- |
+| URL | `/api/v1/profile/` |
+| Method | `GET` |
+| Auth | Required |
 
-* **URL:** `/api/profile/`
-* **Method:** `GET`
-* **Authentication Required:** Yes
+Response example:
 
-* **Response Example (200 OK):**
 ```json
 {
   "username": "democustomer",
   "email": "customer@bookie.local",
   "first_name": "Demo",
   "last_name": "Customer",
-  "date_joined": "2026-06-18T08:00:00Z",
+  "date_joined": "2026-06-18T08:00:00+00:00",
   "is_staff": false,
   "primary_role": "Customer"
 }
 ```
+
+---
+
+## Operational Health
+
+Health endpoints are not versioned because they are operational probes, not product API resources.
+
+| URL | Method | Purpose | Dependency Checks |
+| :--- | :--- | :--- | :--- |
+| `/health/` | `GET` | Full application health summary. | Database and cache. |
+| `/health/live/` | `GET` | Liveness probe for process availability. | None. |
+| `/health/ready/` | `GET` | Readiness probe before routing traffic. | Database and cache. |
+
+Use `/health/live/` for container liveness checks and `/health/ready/` for readiness checks.
