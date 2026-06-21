@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Thanh toán - Bookie{% endblock %}
 {% block content %}
 <h1 class="fw-bold mb-4" style="font-size:1.75rem">
@@ -17,11 +18,9 @@
                         <input class="form-check-input ms-0 me-2" type="radio" name="payment_method" id="pay_{{ value }}" value="{{ value }}" {% if form.payment_method.value == value or forloop.first %}checked{% endif %}>
                         <label class="form-check-label d-flex align-items-center gap-2" for="pay_{{ value }}" style="cursor:pointer">
                             {% if value == 'vnpay' %}
-                            <img src="https://cdn.haitrieu.com/wp-content/uploads/2022/10/Logo-VNPAY-QR-1.png" height="20" alt="VNPay" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block'">
-                            <span class="badge bg-primary" style="display:none">VNPay</span>
+                            <img src="{% static 'img/payments/vnpay.svg' %}" height="24" alt="VNPay">
                             {% elif value == 'momo' %}
-                            <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" height="20" alt="Momo" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block'">
-                            <span class="badge" style="display:none; background:#a50064">MoMo</span>
+                            <img src="{% static 'img/payments/momo.svg' %}" height="24" alt="Momo">
                             {% else %}
                             <i class="bi bi-cash-stack text-success"></i>
                             {% endif %}

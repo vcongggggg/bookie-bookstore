@@ -1060,6 +1060,20 @@ class EnterpriseCVUpgradeTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(callbacks), 0)
 
+    def test_momo_payment_page_uses_local_mock_assets(self):
+        """Verify the mock payment page uses local static assets and clear simulation copy."""
+        order = Order.objects.create(user=self.user, shipping_address="Test Address", payment_method="momo")
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("payment_gateway", args=[order.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Simulated Momo payment")
+        self.assertContains(response, "/static/img/payments/qr-momo-mock.svg")
+        self.assertContains(response, "/static/img/payments/momo.svg")
+        self.assertNotContains(response, "api.qrserver.com")
+        self.assertNotContains(response, "upload.wikimedia.org")
+
     def test_vnpay_return_hardened_checks(self):
         """Verify that vnpay_return validates payment method and checks replay transaction ID."""
         order = Order.objects.create(user=self.user, payment_method="cod")
@@ -1210,4 +1224,3 @@ class EnterpriseCVUpgradeTests(TestCase):
             content_type="application/json"
         )
         self.assertEqual(response.status_code, 400)
-

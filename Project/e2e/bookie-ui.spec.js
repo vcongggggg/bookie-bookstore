@@ -43,12 +43,16 @@ async function expectNoHorizontalOverflow(page) {
   ).toBeLessThanOrEqual(overflow.viewport + 2);
 }
 
-async function loginAsDemo(page) {
+async function loginAs(page, username, password) {
   await page.goto('/login/');
-  await page.locator('input[name="username"]').fill('demo');
-  await page.locator('input[name="password"]').fill('demo123');
+  await page.locator('input[name="username"]').fill(username);
+  await page.locator('input[name="password"]').fill(password);
   await page.locator('form[action="/login/"] button[type="submit"]').click();
   await expect(page).toHaveURL(/\/$/);
+}
+
+async function loginAsDemo(page) {
+  await loginAs(page, 'demo', 'demo123');
 }
 
 test.describe('Bookie UI smoke tests', () => {
@@ -79,11 +83,31 @@ test.describe('Bookie UI smoke tests', () => {
     await page.goto('/cart/');
     await expect(page.locator('#cart-form')).toBeVisible();
     await expect(page.locator('input[type="number"]').first()).toHaveValue(/[1-9]\d*/);
+    await expectNoHorizontalOverflow(page);
 
     await page.locator('a[href="/checkout/"]').click();
     await expect(page).toHaveURL(/\/checkout\/$/);
     await expect(page.locator('#checkout-form')).toBeVisible();
     await page.locator('textarea[name="shipping_address"]').fill('12 Nguyen Trai, Da Nang');
+    await expectNoHorizontalOverflow(page);
+
+    diagnostics.assertClean();
+  });
+
+  test('dashboard and reader layouts avoid horizontal overflow', async ({ page }) => {
+    const diagnostics = attachUiDiagnostics(page);
+
+    await loginAs(page, 'admin', 'admin123');
+
+    await page.goto('/dashboard/');
+    await expect(page.locator('body')).toContainText('Dashboard');
+    await expectNoHorizontalOverflow(page);
+
+    await page.goto('/ebooks/');
+    const firstReadLink = page.locator('a[href*="/read/"]').first();
+    await expect(firstReadLink).toBeVisible();
+    await firstReadLink.click();
+    await expect(page).toHaveURL(/\/books\/\d+\/read\/$/);
     await expectNoHorizontalOverflow(page);
 
     diagnostics.assertClean();

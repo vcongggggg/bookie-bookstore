@@ -61,6 +61,7 @@ This document maps Bookie's main web security risks to the controls currently im
 - VNPay orders must go through the VNPay return handler.
 - VNPay return handling validates checksum, required fields, payment method, transaction amount, order status, and duplicate transaction IDs before marking an order paid.
 - Confirmation email dispatch is queued only on the first successful paid transition.
+- Payment logos and simulated QR visuals are served from local static assets instead of third-party image/QR services.
 
 ### Tested
 
@@ -93,6 +94,7 @@ This document maps Bookie's main web security risks to the controls currently im
 - `/health/ready/` checks dependencies before traffic is routed.
 - Structured console logging is configured for local/Docker visibility.
 - GitHub Actions currently run backend tests and security scans with `pip-audit` and `bandit`.
+- Version-pinned CDN assets for Bootstrap, Bootstrap Icons, Chart.js, Three.js, GSAP, and ScrollTrigger include `integrity` and `crossorigin="anonymous"` attributes.
 
 ### Remaining Gap
 
@@ -117,5 +119,5 @@ This document maps Bookie's main web security risks to the controls currently im
 | Mock payment abuse | Mock endpoint restricted to Momo | View/tests | Tested |
 | AI prompt injection | Keyword guard + catalog grounding | Chatbot/tests | Implemented |
 | Dependency security | `pip-audit`, `bandit` | GitHub Actions | Implemented |
-| CDN/SRI | Planned asset hardening | Phase 4 task | Remaining gap |
+| CDN/SRI | SRI on version-pinned JS/CSS CDN assets | Templates | Implemented |
 | Production monitoring | Health endpoints and logs exist | Views/settings | Partial |
