@@ -2,6 +2,15 @@
 
 Muc tieu cua file nay: bien Bookie tu mot project bookstore co nhieu tinh nang thanh mot portfolio project du suc dua vao CV apply Full-stack/Backend Intern. Ke hoach nay uu tien nhung viec lam tang diem voi reviewer/HR truoc, sau do moi den cac nang cap sau.
 
+## 0.1 Current implementation status - 2026-06-21
+
+- Payment/security hardening da duoc commit trong `fix(payment): harden mock confirmation and transaction replay safety`.
+- API method safety, cart stock validation, va health/API docs da duoc commit trong `chore(api): tighten API methods, validation and health docs`.
+- Security docs da duoc sync lai de noi dung khop code: VNPay hien la return handler, khong phai server-to-server IPN/webhook.
+- README root va `Project/README.md` da chuyen sang repo canonical `vcongggggg/bookie-bookstore` va test badge `75+`.
+- Da tao `docs/screenshots/README.md` va `DEMO_SCRIPT.md`.
+- Viec con lai agent tiep tuc lam: asset/SRI, Playwright e2e, screenshot automation, CI consolidation, full local/Docker verification.
+
 ## 0. Cach dung file nay
 
 - Tick `[x]` khi hoan thanh va da test.
@@ -104,7 +113,7 @@ Acceptance criteria:
 
 ### 3.2 Screenshots
 
-- [ ] `P0` Tao folder `docs/screenshots/`.
+- [x] `P0` Tao folder `docs/screenshots/`.
 - [ ] `P0` Chup it nhat 8 anh:
   - Home/catalog.
   - Book detail.
@@ -134,7 +143,7 @@ Acceptance criteria:
   - Admin update order.
   - Reader/chatbot.
 - [ ] `P1` Them link video vao README.
-- [ ] `P1` Them script demo ngan de noi khi phong van.
+- [x] `P1` Them script demo ngan de noi khi phong van.
 
 Suggested demo script:
 
@@ -541,8 +550,8 @@ Muc tieu: khong de reviewer cam giac "project sinh vien lam cho co".
 
 ### 10.1 General UI
 
-- [ ] `P0` Kiem tra toan bo text brand:
-  - Nen dung thong nhat `Bookie`, khong luc `Smart Bookstore`, luc `Bookie`.
+- [x] `P0` Kiem tra toan bo text brand:
+  - Nen dung thong nhat `Bookie`.
 - [ ] `P0` Kiem tra Vietnamese encoding/text:
   - Khong loi dau.
   - Khong text placeholder.

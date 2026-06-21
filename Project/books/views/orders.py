@@ -97,7 +97,7 @@ def payment_gateway(request, pk: int):
         payment_url = vnp.get_payment_url(
             order_id=order.pk,
             amount=total,
-            order_desc=f"Thanh toan don hang #{order.pk} tai Smart Bookstore",
+            order_desc=f"Thanh toan don hang #{order.pk} tai Bookie",
             ipaddr=request.META.get('REMOTE_ADDR')
         )
         return redirect(payment_url)

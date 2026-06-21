@@ -15,7 +15,7 @@ from books.models import Book
 
 
 def fetch_url(url, timeout=15):
-    req = urllib.request.Request(url, headers={"User-Agent": "SmartBookstore/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Bookie/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode())
 

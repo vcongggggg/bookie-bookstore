@@ -27,7 +27,7 @@ def register(request):
                 send_welcome_email_task(user.pk)
             except Exception:
                 pass  # We don't block the user signup flow if email fails to trigger
-            messages.success(request, "Đăng ký thành công! Chào mừng bạn đến Smart Bookstore.")
+            messages.success(request, "Đăng ký thành công! Chào mừng bạn đến Bookie.")
             return redirect("home")
     else:
         form = RegisterForm()

@@ -1,5 +1,5 @@
 /**
- * Smart Bookstore — Cinematic 3D Landing Page
+ * Bookie — Cinematic 3D Landing Page
  * Inspired by: Hubtown, landing.love
  * Modules: Loader → Three.js Particles → Navbar → GSAP → Tilt → Observers → CTA Particles
  */

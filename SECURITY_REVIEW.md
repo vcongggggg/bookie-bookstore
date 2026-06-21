@@ -1,91 +1,121 @@
-# Bookie Security Architecture & Review
+# Bookie Security Review
 
-This document provides a comprehensive security review of the **Bookie** bookstore application. It maps out potential risks, implementation controls, testing strategies, and CI/CD quality gates designed to achieve professional production-grade security.
+This document maps Bookie's main web security risks to the controls currently implemented in the repository. It is intentionally precise: items marked as implemented are backed by code, tests, or documented production configuration. Remaining gaps are listed explicitly.
 
----
+## 1. Authentication And Session Management
 
-## 1. Authentication & Session Management
+### Implemented
 
-### Risks
-* **Brute-Force Attacks:** Attackers guessing passwords to hijack customer or administrator accounts.
-* **Session Hijacking / Leakage:** Credentials or sessions intercepted via network sniffing or XSS.
+- Login lockout is implemented in `books/views/auth.py`: after 5 failed attempts within a 15-minute window, both the source IP and targeted username are locked out.
+- Lockout events and failed login attempts are logged for operational visibility.
+- Django sessions are configured with `SESSION_COOKIE_HTTPONLY = True`.
+- Production settings support HTTPS-only cookies and SSL redirect through `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, and `SECURE_SSL_REDIRECT`.
+- `CSRF_COOKIE_HTTPONLY = False` in base settings so AJAX/browser code can read and submit the CSRF token where needed. CSRF protection still applies to Django form and session-backed POST flows.
 
-### Controls Implemented
-* **Authenticating Lockout:** Implemented a sliding window lockout inside the authentication views (`books/views/auth.py`). After **5 failed attempts within 15 minutes**, both the IP address and the targeted username are locked out. Lockout events are logged with severity level `WARNING` for monitoring.
-* **HTTP-Only Cookies:** Django session and CSRF cookies are configured with `HttpOnly=True` to prevent access via JavaScript.
-* **Secure Cookie Bindings:** Configured for TLS production environments via:
-  ```python
-  SESSION_COOKIE_SECURE = True
-  CSRF_COOKIE_SECURE = True
-  SECURE_SSL_REDIRECT = True
-  ```
+### Remaining Gap
 
----
+- Admin MFA is not implemented.
+- Production deployment must provide real `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, HTTPS, and secure cookie settings.
 
-## 2. Authorization & RBAC (Role-Based Access Control)
+## 2. Authorization And RBAC
 
-### Risks
-* **IDOR (Insecure Direct Object Reference):** Users modifying URL parameters to view, cancel, or confirm payments of other customers' orders.
-* **Privilege Escalation:** Regular users gaining access to administrative dashboards, inventory metrics, or audit logs.
+### Implemented
 
-### Controls Implemented
-* **Strict Ownership Validation:** All user-facing views retrieve orders using filter constraints linked to the authenticated request user (e.g., `request.user.orders.all()`).
-* **API Shielding:** The JSON detail API (`api_order_detail`) validates that the requesting user matches the order owner or holds `is_staff` privileges, returning a `403 Forbidden` JSON payload on unauthorized access.
-* **Granular Role Hierarchy:** Defined a 5-role matrix (Customer, Support, Staff, Manager, Admin) using Django's group permission system, mapped visually inside the admin dashboards:
-  * **Customer:** Browses books, reads ebooks, views their own orders.
-  * **Support:** Can view and update status of orders.
-  * **Manager:** Can manage categories and inventory.
-  * **Admin:** Master access + audit logs.
+- User-facing order views scope access by `request.user`.
+- `api_order_detail` allows only the owner or staff users and returns `403` for unauthorized authenticated users.
+- Dashboard access is protected by role/permission helpers for Customer, Support, Staff, Manager, and Admin flows.
+- Sensitive dashboard actions are recorded through admin audit logging.
 
----
+### Tested
 
-## 3. Input & Output Protection
+- IDOR-style order access and dashboard role restrictions are covered by backend tests.
 
-### Risks
-* **Cross-Site Scripting (XSS):** Malicious inputs injected into comments, ratings, or ebook content rendering scripts in other users' browsers.
-* **SQL Injection (SQLi):** Raw string interpolation in search fields exposing database schemas.
-* **Prompt Injection (AI Chatbot):** Attackers instructing the chatbot to ignore constraints, output system instructions, or recommend unavailable products.
+### Remaining Gap
 
-### Controls Implemented
-* **HTML Sanitization:** A custom `HTMLParser` runs on uploaded ebook HTML blocks to strip out tags like `<script>`, `<iframe>`, and `<style>` while retaining formatting and Gutenberg image layouts.
-* **ORM Parameterization:** The application queries books and catalogs exclusively using Django ORM syntax (`Book.objects.filter(...)`), which automatically escapes and parameterizes database variables to mitigate SQLi vectors.
-* **Default Auto-Escaping:** Django templates utilize the auto-escape feature to output user-submitted fields as safe plain text.
-* **Chatbot Injection Shields:** The AI query handler checks questions against a blacklist of prompt-injection keywords (e.g., `"ignore previous instructions"`, `"system prompt"`, `"you are now"`). Responses are blocked and safe fallback messages are rendered if threat criteria are met.
+- More browser-level RBAC tests are planned for the Playwright suite.
 
----
+## 3. Input And Output Protection
 
-## 4. Transaction Integrity & Payment Security
+### Implemented
 
-### Risks
-* **Race Conditions / Double-Submit:** Double clicking "Place Order" creating duplicate orders and deducting inventory twice.
-* **Stock Exhaustion:** Multiple simultaneous checkouts for a book with 1 item remaining leading to negative stock counts.
-* **Price Tampering:** Tampering with POST payload variables to buy a book for less.
-* **Payment Hook Tampering:** Spoofing payment provider callbacks to mark orders as paid without completing transaction charges.
+- Django ORM is used for catalog/API/database queries, avoiding raw SQL string interpolation.
+- Django template auto-escaping protects normal user-submitted text.
+- Ebook HTML content is sanitized before rendering dangerous tags such as scripts/iframes/styles.
+- Chatbot prompts are screened for common prompt-injection phrases and constrained to catalog-grounded recommendations.
 
-### Controls Implemented
-* **Idempotency Keys:** Every checkout render injects a unique UUID token into a hidden input field. Order service logic saves this token inside the `Order` model under a `unique` constraint inside a locked transaction. Subsequent posts with the same token fail validation and trigger safe page updates.
-* **Pessimistic Inventory Locking:** The checkout database transaction locks inventory rows using Django's `select_for_update(of=('self',))` inside an atomic block, verifying stock availability before committing deductions.
-* **Backend Amount Verification:** The payment validation handler (`vnpay_return` and mock `payment_confirm` callbacks) extracts transaction metadata, re-calculates order formulas on the database layer, and validates matching values before setting the status to `paid`.
-* **State Transition Locking:** Orders can transition to `paid` or `cancelled` status only once; repeated callbacks are skipped to prevent side effects.
+### Remaining Gap
 
----
+- The prompt-injection filter is intentionally lightweight and should be expanded with a stronger evaluation set before real production use.
+- CSP should remain aligned with frontend assets; external CDN usage requires SRI or local assets.
 
-## 5. Security & Static Analysis (CI/CD)
+## 4. Checkout, Inventory, And Payment Integrity
 
-### Controls Implemented
-* **Automatic Dependency Audit:** The GitHub Actions pipeline runs `pip-audit` to detect known vulnerabilities in third-party Python packages.
-* **Codebase Scanning:** `bandit` scans for bad design choices (e.g., using `assert`, using unsafe random generators, raw subprocess executions) on every commit.
+### Implemented
 
----
+- Checkout uses idempotency keys to prevent duplicate order creation on double-submit.
+- Inventory rows are locked with Django `select_for_update()` inside an atomic transaction before stock is decremented.
+- Payment state transitions are centralized through `mark_order_paid()` so paid orders are processed once.
+- `transaction_id` has a conditional database uniqueness constraint when present, preventing payment replay at DB level.
+- Mock payment confirmation is restricted to Momo simulation only.
+- COD orders cannot be manually marked paid through the mock endpoint.
+- VNPay orders must go through the VNPay return handler.
+- VNPay return handling validates checksum, required fields, payment method, transaction amount, order status, and duplicate transaction IDs before marking an order paid.
+- Confirmation email dispatch is queued only on the first successful paid transition.
 
-## 6. Security Posture Summary Matrix
+### Tested
 
-| Risk Vector | Threat Target | Existing Control | Status |
+- Backend tests cover duplicate checkout idempotency, COD/VNPay mock confirmation rejection, Momo mock success, missing VNPay fields, amount mismatch, duplicate transaction IDs, and duplicate callback side-effect suppression.
+
+### Remaining Gap
+
+- Current VNPay integration is a browser return handler, not a server-to-server IPN/webhook endpoint.
+- Real production payment should add provider sandbox credentials, server-to-server IPN if available, reconciliation logs, refund/cancel lifecycle, and monitoring alerts.
+
+## 5. API Method And Input Safety
+
+### Implemented
+
+- Read-only JSON APIs are restricted to `GET`.
+- Cart API allows only `GET` and `POST`.
+- Cart API validates JSON, action, book ID, positive quantity, stock availability, and current cart quantity against stock.
+- API errors use the shape `{"status": "error", "message": "..."}`.
+
+### Tested
+
+- Backend tests cover unsupported methods, invalid JSON/action/book/quantity, over-stock add/update, and out-of-stock add.
+
+## 6. Operational Security And CI
+
+### Implemented
+
+- `/health/` checks database/cache dependencies.
+- `/health/live/` confirms the Django process is answering without touching DB/cache.
+- `/health/ready/` checks dependencies before traffic is routed.
+- Structured console logging is configured for local/Docker visibility.
+- GitHub Actions currently run backend tests and security scans with `pip-audit` and `bandit`.
+
+### Remaining Gap
+
+- Public deployment still needs platform-level HTTPS, secrets management, log retention, alerting, dependency update policy, and backup/restore procedures.
+- The two current GitHub Actions workflows should be consolidated into one canonical CI workflow.
+
+## 7. Security Posture Matrix
+
+| Area | Existing Control | Evidence | Status |
 | :--- | :--- | :--- | :--- |
-| **Brute Force** | Admin/Customer Login | Sliding lockout window (5 attempts/15m) + Security Logs | **Secured** |
-| **SQL Injection** | Catalog Search / API | 100% Parameterized Django ORM usage | **Secured** |
-| **XSS** | Ebook Viewer / Ratings | HTML sanitizer + Django Template Auto-escape | **Secured** |
-| **IDOR** | Order / Cart Details | User scoping on order views + `api_order_detail` ownership checks | **Secured** |
-| **Price Tampering** | Payment Gateway | Server-side recalculation and validation in IPN callback | **Secured** |
-| **Double Spend** | Checkout / VNPay | Concurrency row locks + unique Idempotency Keys | **Secured** |
-| **AI Prompt Abuse**| Chatbot Assistant | Lexical screening & strict prompt anchoring | **Secured** |
+| Brute force | IP + username lockout | Auth view + tests/logs | Implemented |
+| Session cookies | HttpOnly sessions, production secure-cookie settings | Django settings | Implemented |
+| CSRF | Django CSRF middleware/forms/AJAX token usage | Views/templates/settings | Implemented |
+| SQL injection | Django ORM query construction | Views/services/API | Implemented |
+| XSS | Auto-escape + ebook sanitizer | Templates/sanitizer | Implemented |
+| IDOR | Owner/staff checks for orders | Views/API/tests | Tested |
+| RBAC | Role helpers and dashboard restrictions | RBAC/dashboard/tests | Implemented |
+| Checkout race condition | Atomic transaction + `select_for_update()` | Order service/tests | Tested |
+| Double submit | Checkout idempotency key | Model/service/tests | Tested |
+| Payment replay | Unique `transaction_id` + paid transition service | Model/service/tests | Tested |
+| VNPay tampering | Checksum, amount, method, required fields | Return handler/tests | Tested |
+| Mock payment abuse | Mock endpoint restricted to Momo | View/tests | Tested |
+| AI prompt injection | Keyword guard + catalog grounding | Chatbot/tests | Implemented |
+| Dependency security | `pip-audit`, `bandit` | GitHub Actions | Implemented |
+| CDN/SRI | Planned asset hardening | Phase 4 task | Remaining gap |
+| Production monitoring | Health endpoints and logs exist | Views/settings | Partial |
