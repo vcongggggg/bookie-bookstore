@@ -7,10 +7,12 @@ Muc tieu cua file nay: bien Bookie tu mot project bookstore co nhieu tinh nang t
 - Payment/security hardening da duoc commit trong `fix(payment): harden mock confirmation and transaction replay safety`.
 - API method safety, cart stock validation, va health/API docs da duoc commit trong `chore(api): tighten API methods, validation and health docs`.
 - Security docs da duoc sync lai de noi dung khop code: VNPay hien la return handler, khong phai server-to-server IPN/webhook.
-- README root va `Project/README.md` da chuyen sang repo canonical `vcongggggg/bookie-bookstore` va test badge `75+`.
+- README root va `Project/README.md` da chuyen sang repo canonical `vcongggggg/bookie-bookstore` va test badge `77`.
 - Da tao `docs/screenshots/README.md` va `DEMO_SCRIPT.md`.
 - Da hop nhat CI vao `.github/workflows/ci.yml` voi backend, security, Playwright smoke, va Docker validation jobs.
-- Viec con lai agent tiep tuc lam: full local/Docker verification, final CV bullets, deploy public/video demo neu co tai khoan va platform.
+- Da tao `BOOKIE_CV_BULLETS.md` de dung truc tiep cho CV theo tung nhom role.
+- Full local verification da pass: `python manage.py check`, `python manage.py test books` voi `77 tests OK`, `npm.cmd run test:e2e` voi `18 passed, 2 skipped`, `npm.cmd run screenshots`, `docker compose config --quiet`, `docker compose build web worker`, Docker home `200 OK`, health live/ready healthy.
+- Viec con lai ngoai repo: deploy public, quay demo video, va push len GitHub.
 
 ## 0. Cach dung file nay
 

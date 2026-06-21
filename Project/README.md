@@ -3,7 +3,7 @@
 [![Bookie CI](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/ci.yml/badge.svg)](https://github.com/vcongggggg/bookie-bookstore/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/django-6.x-092E20.svg)](https://www.djangoproject.com/)
-[![Tests](https://img.shields.io/badge/tests-75%2B%20passing-brightgreen.svg)](../TESTING.md)
+[![Tests](https://img.shields.io/badge/tests-77%20passing-brightgreen.svg)](../TESTING.md)
 
 Bookie is a full-stack Django bookstore platform built as a portfolio-grade project: catalog, cart, checkout, order management, RBAC dashboard, offline ebook reader, background jobs, JSON APIs, health checks, and security-focused payment handling.
 
@@ -95,7 +95,7 @@ npm.cmd run test:e2e:smoke
 npm.cmd run screenshots
 ```
 
-Current verified baseline: `75+ backend tests passing` plus Playwright smoke flows for public pages, cart/checkout, COD checkout, simulated Momo payment, RBAC dashboard access, health probes, reader, and chatbot.
+Current verified baseline: `77 backend tests OK`; Playwright `18 passed, 2 skipped`; Docker web/worker build passed; Docker home returned `200 OK`; health live/ready returned healthy JSON.
 
 ## 6. Demo Credentials
 

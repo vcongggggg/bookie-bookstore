@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-6.x-092E20?logo=django&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-75%2B%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-77%20passing-brightgreen)
 
 Bookie is a production-oriented Django bookstore project featuring full e-commerce workflows, an admin dashboard, an offline PWA ebook reader, background tasks, Redis caching, JSON APIs, and security-focused checkout/payment flows.
 
@@ -47,17 +47,23 @@ More screenshots are available in [docs/screenshots](docs/screenshots/).
 
 ## Current Verification
 
-Latest local verification in this branch:
+Latest local verification on 2026-06-21:
 
 ```powershell
 cd Project
 python manage.py check
-python manage.py test books.tests.EnterpriseCVUpgradeTests
-npm.cmd run test:e2e:smoke -- --project=chromium-mobile
+python manage.py test books
+npm.cmd run test:e2e
 npm.cmd run screenshots
+docker compose config --quiet
+docker compose build web worker
+docker compose up -d --force-recreate web worker
+curl.exe -I http://127.0.0.1:8000/
+curl.exe -s http://127.0.0.1:8000/health/live/
+curl.exe -s http://127.0.0.1:8000/health/ready/
 ```
 
-Current baseline: `75+ backend tests passing`, Playwright smoke coverage for public pages, cart/checkout, COD checkout, Momo mock payment, RBAC dashboard, health probes, reader, and chatbot. Final full verification is tracked in Phase 6.
+Current baseline: `77 backend tests OK`; Playwright `18 passed, 2 skipped`; Docker web/worker build passed; Docker home returned `200 OK`; health live/ready returned healthy JSON.
 
 ## Run Locally
 

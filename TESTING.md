@@ -38,6 +38,10 @@ Playwright artifacts are uploaded on failure from `Project/playwright-report` an
 
 ## Current Automated Coverage
 
+Current backend baseline: `77 tests OK`.
+
+Playwright baseline: `18 passed, 2 skipped` when running `npm.cmd run test:e2e`; the 2 skipped tests are portfolio screenshot captures, which run through `npm.cmd run screenshots`.
+
 Backend tests cover:
 
 - Home, catalog, and book detail smoke behavior.
