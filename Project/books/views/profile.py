@@ -53,6 +53,27 @@ def profile_change_password(request):
 
 
 
+_POSITIVE_WORDS = {
+    "hay", "tot", "tuyet", "voi", "dep", "nhanh", "uy", "tin", "chat", "luong",
+    "great", "good", "excellent", "amazing", "wonderful", "love", "best",
+    "fantastic", "perfect", "recommend", "enjoyed", "beautiful", "brilliant",
+    "masterpiece", "outstanding", "superb", "awesome", "incredible", "favorite",
+    "exciting", "engaging", "fascinating", "captivating", "delightful",
+    "impressive", "satisfying", "remarkable", "touching", "inspiring",
+    "classic", "pleased", "happy", "entertaining", "fun", "intriguing",
+    "profound", "thich", "xuat", "sac", "dinh", "pro", "helpful",
+    "informative", "insightful", "compelling", "riveting",
+}
+
+_NEGATIVE_WORDS = {
+    "te", "chan", "kem", "do", "toi", "xau", "bad", "terrible", "awful",
+    "horrible", "boring", "waste", "poor", "disappointing", "worst", "hate",
+    "slow", "confusing", "mediocre", "overrated", "predictable", "dull",
+    "weak", "annoying", "frustrating", "tham", "nham", "that", "vong",
+    "khong", "bof",
+}
+
+
 def _analyze_sentiment(text):
     """Simple rule-based sentiment analysis.
     Returns: ('positive', score), ('negative', score), or ('neutral', score)
