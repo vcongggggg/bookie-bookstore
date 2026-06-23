@@ -31,3 +31,8 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local portfolio draft
+portfolio/index.html
+portfolio/script.js
+portfolio/styles.css
