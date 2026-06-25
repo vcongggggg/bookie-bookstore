@@ -45,11 +45,19 @@
         }
 
         [data-theme="dark"] {
+            --primary: #FBBF24;
+            --primary-dark: #D97706;
+            --primary-light: #FDE68A;
+            --accent: #FDBA74;
+            --gold: #FDE68A;
+            --accent2: #FCD34D;
+            --success: #86EFAC;
+            --danger: #FCA5A5;
             --bg-body: #0F172A;
             --bg-card: #1E293B;
             --text-primary: #F8FAFC;
             --text-secondary: #CBD5E1;
-            --text-muted: #64748B;
+            --text-muted: #94A3B8;
             --border: #334155;
             --glass: rgba(30, 41, 59, 0.7);
             --glass-border: rgba(255, 255, 255, 0.1);
@@ -823,10 +831,10 @@
             color: #fff;
         }
         [data-theme="dark"] .pagination .page-item.active .page-link {
-            background: #D97706;
+            background: #B45309;
             color: #FFFFFF;
-            border-color: #D97706;
-            box-shadow: 0 8px 20px rgba(217, 119, 6, .28);
+            border-color: #B45309;
+            box-shadow: 0 8px 20px rgba(180, 83, 9, .3);
         }
         .pagination .page-item.disabled .page-link {
             color: var(--text-muted);
@@ -1183,6 +1191,150 @@
             border-color: #FBBF24;
             color: #FFFFFF;
             box-shadow: 0 0 0 4px rgba(251, 191, 36, .14);
+        }
+        [data-theme="dark"] .text-muted {
+            color: #94A3B8 !important;
+        }
+        [data-theme="dark"] .text-dark,
+        [data-theme="dark"] .text-body,
+        [data-theme="dark"] .text-black {
+            color: #F8FAFC !important;
+        }
+        [data-theme="dark"] .bg-white,
+        [data-theme="dark"] .bg-light {
+            background-color: #111827 !important;
+            color: #F8FAFC !important;
+        }
+        [data-theme="dark"] .payment-qr-box {
+            background-color: #FFFFFF !important;
+            color: #1F2937 !important;
+            border-color: #E5E7EB !important;
+        }
+        [data-theme="dark"] .border,
+        [data-theme="dark"] .border-top,
+        [data-theme="dark"] .border-bottom,
+        [data-theme="dark"] .border-start,
+        [data-theme="dark"] .border-end {
+            border-color: rgba(148, 163, 184, .2) !important;
+        }
+        [data-theme="dark"] .card,
+        [data-theme="dark"] .card-book,
+        [data-theme="dark"] .white-panel,
+        [data-theme="dark"] .glass-panel,
+        [data-theme="dark"] .empty-state,
+        [data-theme="dark"] .modal-content,
+        [data-theme="dark"] .list-group-item {
+            background-color: #111827;
+            color: #F8FAFC;
+            border-color: rgba(148, 163, 184, .18);
+        }
+        [data-theme="dark"] .white-panel {
+            box-shadow: 0 18px 45px rgba(0, 0, 0, .32);
+        }
+        [data-theme="dark"] .filter-panel {
+            background: rgba(17, 24, 39, .9);
+            border-color: rgba(148, 163, 184, .2);
+            box-shadow: 0 18px 45px rgba(0, 0, 0, .28);
+        }
+        [data-theme="dark"] .card-book .img-wrapper {
+            background: rgba(15, 23, 42, .9);
+        }
+        [data-theme="dark"] .card-book .card-title,
+        [data-theme="dark"] .card-book .card-title a {
+            color: #F8FAFC;
+        }
+        [data-theme="dark"] .card-book .author {
+            color: #94A3B8;
+        }
+        [data-theme="dark"] .meta-chip,
+        [data-theme="dark"] .badge-category {
+            background: rgba(30, 41, 59, .88);
+            border-color: rgba(148, 163, 184, .2);
+            color: #CBD5E1;
+        }
+        [data-theme="dark"] .input-group-text {
+            background-color: #111827 !important;
+            border-color: rgba(148, 163, 184, .24) !important;
+            color: #CBD5E1 !important;
+        }
+        [data-theme="dark"] .table {
+            --bs-table-bg: transparent;
+            --bs-table-color: #E5E7EB;
+            --bs-table-border-color: rgba(148, 163, 184, .18);
+            --bs-table-striped-bg: rgba(148, 163, 184, .06);
+            --bs-table-striped-color: #F8FAFC;
+            --bs-table-hover-bg: rgba(251, 191, 36, .08);
+            --bs-table-hover-color: #F8FAFC;
+            color: #E5E7EB;
+        }
+        [data-theme="dark"] .table > :not(caption) > * > * {
+            color: inherit;
+            border-bottom-color: rgba(148, 163, 184, .18);
+        }
+        [data-theme="dark"] .alert {
+            border-color: rgba(148, 163, 184, .18);
+        }
+        [data-theme="dark"] .alert-info,
+        [data-theme="dark"] .alert-bs.alert-info {
+            background: rgba(59, 130, 246, .16) !important;
+            color: #BFDBFE !important;
+        }
+        [data-theme="dark"] .alert-warning,
+        [data-theme="dark"] .alert-bs.alert-warning {
+            background: rgba(245, 158, 11, .16) !important;
+            color: #FDE68A !important;
+        }
+        [data-theme="dark"] .alert-danger,
+        [data-theme="dark"] .alert-error,
+        [data-theme="dark"] .alert-bs.alert-danger,
+        [data-theme="dark"] .alert-bs.alert-error {
+            background: rgba(239, 68, 68, .16) !important;
+            color: #FCA5A5 !important;
+        }
+        [data-theme="dark"] .alert-success,
+        [data-theme="dark"] .alert-bs.alert-success {
+            background: rgba(34, 197, 94, .16) !important;
+            color: #BBF7D0 !important;
+        }
+        [data-theme="dark"] .btn-close {
+            filter: invert(1) grayscale(100%) brightness(180%);
+        }
+        [data-theme="dark"] .live-search-results,
+        [data-theme="dark"] .chat-window,
+        [data-theme="dark"] .chat-input-group,
+        [data-theme="dark"] .msg-bot {
+            background: #111827;
+            color: #F8FAFC;
+            border-color: rgba(148, 163, 184, .18);
+        }
+        [data-theme="dark"] .live-search-item {
+            color: #E5E7EB;
+            border-bottom-color: rgba(148, 163, 184, .14);
+        }
+        [data-theme="dark"] .live-search-item:hover {
+            background: rgba(251, 191, 36, .1);
+        }
+        [data-theme="dark"] .chat-footer {
+            background: #0F172A;
+            border-top-color: rgba(148, 163, 184, .18);
+        }
+        [data-theme="dark"] .chat-input {
+            color: #F8FAFC;
+        }
+        [data-theme="dark"] .chat-input::placeholder {
+            color: #94A3B8;
+            opacity: 1;
+        }
+        [data-theme="dark"] .book-card-mini,
+        [data-theme="dark"] .quick-reply {
+            background: rgba(30, 41, 59, .9);
+            border-color: rgba(148, 163, 184, .22);
+            color: #E5E7EB !important;
+        }
+        [data-theme="dark"] .book-card-mini:hover,
+        [data-theme="dark"] .quick-reply:hover {
+            background: rgba(251, 191, 36, .14);
+            color: #FBBF24 !important;
         }
         .badge-category {
             background: rgba(192,86,33,.12);

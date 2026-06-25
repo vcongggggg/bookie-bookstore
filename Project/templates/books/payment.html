@@ -29,7 +29,7 @@
                 </div>
 
                 <div class="text-center mb-4">
-                    <div class="p-3 d-inline-block bg-white shadow-sm" style="border-radius:16px; border: 1px solid #eee">
+                    <div class="payment-qr-box p-3 d-inline-block bg-white shadow-sm" style="border-radius:16px; border: 1px solid #eee">
                         {% if order.payment_method == 'vnpay' %}
                         <img src="{% static 'img/payments/qr-vnpay-mock.svg' %}" alt="VNPay mock QR" style="width:200px; height:200px">
                         <div class="mt-2 fw-bold text-primary">VNPay return flow</div>
