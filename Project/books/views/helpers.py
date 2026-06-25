@@ -168,13 +168,21 @@ def _order_books_by_ids(queryset, ids):
 
 def _get_popular_books(limit: int = 15):
     """Sách bán chạy nhất dựa trên số lượng đơn hàng."""
-    cache_key = f"popular_books_{limit}"
+    cache_key = f"popular_books_with_covers_{limit}"
     books = cache.get(cache_key)
     if books is None:
         books = list(
-            Book.objects.annotate(total_sold=Count("order_items"))
+            Book.objects.exclude(cover_image="")
+            .annotate(total_sold=Count("order_items"))
             .order_by("-total_sold", "title")[:limit]
         )
+        if len(books) < limit:
+            existing_ids = [book.pk for book in books]
+            books.extend(
+                Book.objects.exclude(pk__in=existing_ids)
+                .annotate(total_sold=Count("order_items"))
+                .order_by("-total_sold", "title")[: limit - len(books)]
+            )
         cache.set(cache_key, books, 3600)
     return books
 

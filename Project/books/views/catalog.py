@@ -1,4 +1,5 @@
 from .helpers import *
+import unicodedata
 from django.urls import reverse
 from .helpers import (
     _push_recently_viewed, _recently_viewed_books, _get_popular_books,
@@ -6,6 +7,38 @@ from .helpers import (
     _books_queryset
 )
 from .profile import _get_explainable_recommendations, _get_book_sentiment_summary, _analyze_sentiment
+
+
+def _normalize_label(value: str) -> str:
+    value = unicodedata.normalize("NFD", value or "").lower()
+    return "".join(char for char in value if unicodedata.category(char) != "Mn")
+
+
+def _category_image_path(category_name: str) -> str:
+    name = _normalize_label(category_name)
+    if "lap trinh" in name or "programming" in name or "technology" in name:
+        return "img/categories/Programming.webp"
+    if "khoa hoc" in name or "science" in name:
+        return "img/categories/Science.avif"
+    if "trinh tham" in name or "mystery" in name:
+        return "img/categories/Mystery.webp"
+    if "lang man" in name or "romance" in name:
+        return "img/categories/Romance.png"
+    if "van hoc" in name or "fiction" in name:
+        return "img/categories/Fiction.jpg"
+    if "kinh dien" in name or "classic" in name:
+        return "img/categories/classics.png"
+    if "kinh te" in name or "economics" in name:
+        return "img/categories/economics.png"
+    if "tam ly" in name or "psychology" in name:
+        return "img/categories/psychology.png"
+    return "img/categories/classics.png"
+
+
+def _attach_category_images(categories):
+    for category in categories:
+        category.image_path = _category_image_path(category.name)
+    return categories
 
 @ensure_csrf_cookie
 def home(request):
@@ -22,6 +55,7 @@ def home(request):
     if categories is None:
         categories = list(Category.objects.annotate(book_count=Count("books")).order_by("name"))
         cache.set("category_list_cache", categories, 3600)
+    categories = _attach_category_images(categories)
     
     # Get some featured reviews for section 6
     recent_reviews = Rating.objects.select_related("user", "book").order_by("-created_at")[:10]
@@ -104,6 +138,7 @@ def category_list(request):
     if categories is None:
         categories = list(Category.objects.annotate(book_count=Count("books")).order_by("name"))
         cache.set("category_list_cache", categories, 3600)
+    categories = _attach_category_images(categories)
     return render(request, "books/category_list.html", {"categories": categories})
 
 

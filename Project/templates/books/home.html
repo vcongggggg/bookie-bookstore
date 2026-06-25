@@ -278,25 +278,7 @@
                 
                 <!-- Background Image Mapping -->
                 <div class="bento-img-bg">
-                    {% with name=category.name|lower %}
-                        {% if "fiction" in name %}
-                        <img src="{% static 'img/categories/Fiction.jpg' %}" alt="">
-                        {% elif "mystery" in name %}
-                        <img src="{% static 'img/categories/Mystery.webp' %}" alt="">
-                        {% elif "programming" in name %}
-                        <img src="{% static 'img/categories/Programming.webp' %}" alt="">
-                        {% elif "romance" in name %}
-                        <img src="{% static 'img/categories/Romance.png' %}" alt="">
-                        {% elif "science" in name %}
-                        <img src="{% static 'img/categories/Science.avif' %}" alt="">
-                        {% elif "kinh tế" in name or "economics" in name %}
-                        <img src="{% static 'img/categories/economics.png' %}" alt="">
-                        {% elif "tâm lý" in name or "psychology" in name %}
-                        <img src="{% static 'img/categories/psychology.png' %}" alt="">
-                        {% else %}
-                        <img src="{% static 'img/categories/classics.png' %}" alt="">
-                        {% endif %}
-                    {% endwith %}
+                    <img src="{% static category.image_path %}" alt="{{ category.name }}">
                 </div>
                 <div class="bento-overlay"></div>
 
