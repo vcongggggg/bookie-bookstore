@@ -99,6 +99,11 @@
             z-index: 1030;
             transition: var(--transition);
         }
+        [data-theme="dark"] .navbar-bs {
+            background: rgba(8, 13, 27, .92);
+            border-bottom-color: rgba(148, 163, 184, .16);
+            box-shadow: 0 10px 32px rgba(0, 0, 0, .28);
+        }
         .navbar-bs .navbar-collapse {
             flex-wrap: nowrap;
         }
@@ -117,6 +122,9 @@
             display: inline-flex;
             align-items: center;
             gap: .6rem;
+        }
+        [data-theme="dark"] .navbar-bs .navbar-brand {
+            color: #F8FAFC;
         }
         .brand-mark {
             margin-right: 12px;
@@ -168,13 +176,25 @@
             transition: var(--transition);
         }
         [data-theme="dark"] .navbar-bs .nav-link i {
-            color: var(--primary-light);
-            filter: drop-shadow(0 0 5px rgba(162,155,254,.3));
+            color: #CBD5E1;
+            filter: none;
+        }
+        [data-theme="dark"] .navbar-bs .nav-link {
+            color: #E5E7EB !important;
         }
         .navbar-bs .nav-link:hover,
         .navbar-bs .nav-link.active {
             color: var(--accent) !important;
             background: rgba(192,86,33,.08);
+        }
+        [data-theme="dark"] .navbar-bs .nav-link:hover,
+        [data-theme="dark"] .navbar-bs .nav-link.active {
+            color: #FBBF24 !important;
+            background: rgba(251, 191, 36, .12);
+        }
+        [data-theme="dark"] .navbar-bs .nav-link:hover i,
+        [data-theme="dark"] .navbar-bs .nav-link.active i {
+            color: #FBBF24;
         }
         .navbar-bs .nav-link:hover i {
             transform: scale(1.1);
@@ -203,11 +223,24 @@
             background: var(--bg-body);
             color: var(--text-primary);
         }
+        [data-theme="dark"] .search-wrapper input {
+            background: #0F172A;
+            border-color: rgba(148, 163, 184, .26);
+            color: #F8FAFC;
+        }
+        [data-theme="dark"] .search-wrapper input::placeholder {
+            color: #94A3B8;
+            opacity: 1;
+        }
         .search-wrapper input:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 4px rgba(192,86,33,.12);
             outline: none;
             width: 260px;
+        }
+        [data-theme="dark"] .search-wrapper input:focus {
+            border-color: #FBBF24;
+            box-shadow: 0 0 0 4px rgba(251, 191, 36, .16);
         }
 @media (max-width: 991.98px) {
     .search-wrapper { width: 100%; margin-bottom: 1rem; }
@@ -219,6 +252,9 @@
             top: 50%;
             transform: translateY(-50%);
             color: var(--text-muted);
+        }
+        [data-theme="dark"] .search-wrapper .search-icon {
+            color: #94A3B8;
         }
 
         /* Live search dropdown */
@@ -403,9 +439,19 @@
             padding: .45rem 1.2rem;
             transition: var(--transition);
         }
+        [data-theme="dark"] .btn-glass {
+            background: rgba(30, 41, 59, .86);
+            border-color: rgba(148, 163, 184, .18);
+            color: #F8FAFC;
+        }
         .btn-glass:hover {
             background: var(--bg-body);
             box-shadow: var(--shadow-sm);
+        }
+        [data-theme="dark"] .btn-glass:hover,
+        [data-theme="dark"] .btn-glass:focus {
+            background: rgba(51, 65, 85, .95);
+            color: #FFFFFF;
         }
         .btn-icon {
             width: 38px;
@@ -758,16 +804,37 @@
             padding: .5rem .85rem;
             transition: var(--transition);
         }
+        [data-theme="dark"] .pagination .page-link {
+            background: rgba(30, 41, 59, .92);
+            color: #CBD5E1;
+            border: 1px solid rgba(148, 163, 184, .14);
+        }
         .pagination .page-link:hover {
             background: rgba(192,86,33,.08);
             color: var(--accent);
+        }
+        [data-theme="dark"] .pagination .page-link:hover {
+            background: rgba(251, 191, 36, .14);
+            color: #FBBF24;
+            border-color: rgba(251, 191, 36, .26);
         }
         .pagination .page-item.active .page-link {
             background: var(--gradient-2);
             color: #fff;
         }
+        [data-theme="dark"] .pagination .page-item.active .page-link {
+            background: #D97706;
+            color: #FFFFFF;
+            border-color: #D97706;
+            box-shadow: 0 8px 20px rgba(217, 119, 6, .28);
+        }
         .pagination .page-item.disabled .page-link {
             color: var(--text-muted);
+        }
+        [data-theme="dark"] .pagination .page-item.disabled .page-link {
+            background: rgba(15, 23, 42, .7);
+            color: #64748B;
+            border-color: rgba(148, 163, 184, .1);
         }
 
         /* ───── Animations ───── */
@@ -1074,15 +1141,48 @@
         /* ───── Misc ───── */
         .breadcrumb-item a { color: var(--primary); text-decoration: none; }
         .breadcrumb-item.active { color: var(--text-muted); }
+        [data-theme="dark"] .dropdown-menu {
+            background: #111827;
+            border: 1px solid rgba(148, 163, 184, .18) !important;
+            box-shadow: 0 18px 48px rgba(0, 0, 0, .38) !important;
+        }
+        [data-theme="dark"] .dropdown-item {
+            color: #E5E7EB;
+        }
+        [data-theme="dark"] .dropdown-item:hover,
+        [data-theme="dark"] .dropdown-item:focus {
+            background: rgba(251, 191, 36, .12);
+            color: #FBBF24;
+        }
+        [data-theme="dark"] .dropdown-divider {
+            border-top-color: rgba(148, 163, 184, .18);
+        }
         .form-control, .form-select {
             border-radius: var(--radius-sm);
             border: 2px solid var(--border);
             padding: .6rem 1rem;
             transition: var(--transition);
         }
+        [data-theme="dark"] .form-control,
+        [data-theme="dark"] .form-select {
+            background-color: #0F172A;
+            border-color: rgba(148, 163, 184, .24);
+            color: #F8FAFC;
+        }
+        [data-theme="dark"] .form-control::placeholder {
+            color: #94A3B8;
+            opacity: 1;
+        }
         .form-control:focus, .form-select:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 4px rgba(108,92,231,.1);
+        }
+        [data-theme="dark"] .form-control:focus,
+        [data-theme="dark"] .form-select:focus {
+            background-color: #111827;
+            border-color: #FBBF24;
+            color: #FFFFFF;
+            box-shadow: 0 0 0 4px rgba(251, 191, 36, .14);
         }
         .badge-category {
             background: rgba(192,86,33,.12);
