@@ -8,7 +8,7 @@
  *  - API calls: Network-Only
  */
 
-const CACHE_VERSION = 'bookie-v1';
+const CACHE_VERSION = 'bookie-v2';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const READER_CACHE = `reader-${CACHE_VERSION}`;
 
@@ -32,7 +32,16 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((keys) =>
             Promise.all(
                 keys
-                    .filter((key) => key !== STATIC_CACHE && key !== READER_CACHE)
+                    .filter((key) => (
+                        key !== STATIC_CACHE &&
+                        key !== READER_CACHE &&
+                        (
+                            key.startsWith('static-bookie-') ||
+                            key.startsWith('reader-bookie-') ||
+                            key.startsWith('static-') ||
+                            key.startsWith('reader-')
+                        )
+                    ))
                     .map((key) => caches.delete(key))
             )
         ).then(() => self.clients.claim())

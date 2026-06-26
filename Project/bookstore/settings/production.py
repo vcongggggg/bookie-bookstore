@@ -64,14 +64,30 @@ STORAGES = {
 }
 
 # Security and deployment configuration
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = os.environ.get('USE_X_FORWARDED_HOST', 'True') == 'True'
+
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
 SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True') == 'True'
 CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'True') == 'True'
-CSRF_TRUSTED_ORIGINS = [
+SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
+CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'Lax')
+
+CSRF_TRUSTED_ORIGINS = {
     origin.strip()
     for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
     if origin.strip()
-]
+}
+for host in ALLOWED_HOSTS + [os.environ.get('RENDER_EXTERNAL_HOSTNAME', '')]:
+    host = (host or '').strip()
+    if not host:
+        continue
+    if host.startswith('.'):
+        CSRF_TRUSTED_ORIGINS.add(f'https://*{host}')
+    elif '*' not in host:
+        CSRF_TRUSTED_ORIGINS.add(f'https://{host}')
+CSRF_TRUSTED_ORIGINS = sorted(CSRF_TRUSTED_ORIGINS)
+
 SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'True') == 'True'
 SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'True') == 'True'

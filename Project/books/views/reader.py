@@ -220,7 +220,9 @@ def service_worker(request):
     try:
         with open(sw_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        return HttpResponse(content, content_type='application/javascript')
+        response = HttpResponse(content, content_type='application/javascript')
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response
     except IOError:
         raise Http404("Service Worker not found")
 
